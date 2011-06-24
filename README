@@ -1,0 +1,2 @@
+to compile mon_async, run:
+	gcc -o mon_async mon_async.c -levent -L/usr/local/lib
