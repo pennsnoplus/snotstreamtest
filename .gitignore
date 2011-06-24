@@ -1,2 +1,5 @@
 *.[oa]
 *.swp
+mon_async
+fd_async
+hello-world
