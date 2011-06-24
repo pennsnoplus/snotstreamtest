@@ -1,7 +1,7 @@
 
 /*
    This exmple program provides a trivial server program that listens for TCP
-   connections on port 9995.  When they arrive, it writes a short message to
+   connections on port 8080.  When they arrive, it writes a short message to
    each client connection, and closes each connection once it is flushed.
 
    Where possible, it exits cleanly in response to a SIGINT (ctrl-c).
@@ -28,7 +28,7 @@
 
 static const char MESSAGE[] = "Hello, World!\n";
 
-static const int PORT = 9995;
+static const int PORT = 8080;
 
 static void listener_cb(struct evconnlistener *, evutil_socket_t,
 		struct sockaddr *, int socklen, void *);
@@ -124,7 +124,10 @@ static void listener_cb(struct evconnlistener *listener, evutil_socket_t fd,stru
 	bufferevent_enable(bev, EV_WRITE);
 	bufferevent_disable(bev, EV_READ);
 
-	bufferevent_write(bev, MESSAGE, strlen(MESSAGE));
+	int i;
+	for(int i=0; i<50; i++){
+		bufferevent_write(bev, MESSAGE, strlen(MESSAGE));
+	}
 }
 
 static void conn_writecb(struct bufferevent *bev, void *user_data) {
