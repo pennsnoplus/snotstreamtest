@@ -125,7 +125,7 @@ static void listener_cb(struct evconnlistener *listener, evutil_socket_t fd,stru
 	bufferevent_disable(bev, EV_READ);
 
 	int i;
-	for(i=0; i<50; i++){
+	for(i=0; i<5; i++){
 		bufferevent_write(bev, MESSAGE, strlen(MESSAGE));
 	}
 }

@@ -11,52 +11,53 @@
 #include <event2/buffer.h>
 #include <event2/util.h>
 
-#define EB_HOST "localhost"
-#define EB_PORT 8080
-#define NUM_CONS 1
+#define NUM_CONS 2 // maximum number of ports to be monitored
 
 typedef struct data_con {
-	struct bufferevent *bev;
-	char name[50];
-	char host[50];
-	int port;
+	// Holds the data for a single monitoring connection
+	struct bufferevent *bev; // holds a buffer event
+	char name[50]; // name of this connection (arbitrary)
+	char host[50]; // host (e.g., "localhost")
+	int port; // port (e.g., 8080)
 } data_con;
 
 void setup_con(data_con *con, char* nm, char *hst, int prt){
+	// Initializes a data_con structure
 	memset(&(con->name), '\0', sizeof con->name);
 	memset(&(con->host), '\0', sizeof con->host);
 	strncpy(con->name, nm, strlen(nm));
 	strncpy(con->host, hst, strlen(hst));
 	con->port = prt;
-	printf("con->name=%s\n", con->name);
-	printf("con->host=%s\n", con->host);
-	printf("con->port=%d\n", con->port);
 }
 
 void eventcb(struct bufferevent *bev, short events, void *ptr)
 {
+	data_con con = *((data_con *)(ptr));
 	if (events & BEV_EVENT_CONNECTED) {
-		printf("Connected to 127.0.0.1:8080\n");
-		/* We're connected to 127.0.0.1:8080.   Ordinarily we'd do
-		   something here, like start reading or writing. */
+		printf("Connected to %s (%s:%d).\n", con.name, con.host, con.port);
+		/* Ordinarily we'd do something here, like
+		   start reading or writing. */
+		if (strncmp(con.name, "mon_control", 11) == 0) { // if the controller is connected
+			// TODO: execute controller commands here
+		}
 	} else if (events & BEV_EVENT_ERROR) {
 		/* An error occured while connecting. */
-		printf("Unable to connect.\n");
+		printf("Unable to connect to %s (%s:%d).\n", con.name, con.host, con.port);
 	} else if (events & BEV_EVENT_EOF) {
-		printf("Connection closed.\n");
+		printf("Connection to %s (%s:%d) closed.\n", con.name, con.host, con.port);
 	}
 }
 
 void readcb(struct bufferevent *bev, void *ptr)
 {
-	printf("> ");
+	data_con con = *((data_con *)(ptr));
+	printf("--- %s ---\n", con.name);
 	char buf[1024];
 	int n;
 	struct evbuffer *input = bufferevent_get_input(bev);
 	while ((n = evbuffer_remove(input, buf, sizeof(buf))) > 0) {
 		fwrite(buf, 1, n, stdout);
 	}
-	printf("\n");
 }
 
 void signalcb(evutil_socket_t sig, short events, void *user_data){
@@ -69,15 +70,36 @@ void signalcb(evutil_socket_t sig, short events, void *user_data){
 
 int main(int argc, char* argv[])
 {
-	struct event_base *base;
-	struct evdns_base *dns_base;
+	struct event_base *base;		// event loop
+	struct evdns_base *dns_base;	// for hostname resolution
+	
+	// Configure our event_base to be fast
+	struct event_config *cfg;
+	cfg = event_config_new();
+	event_config_avoid_method(cfg, "select"); // We don't want no select
+	event_config_avoid_method(cfg, "poll"); // NO to poll
+
+	base = event_base_new_with_config(cfg); // use the custom config
+	event_config_free(cfg); // all done with this
+
+	if (!base) {
+		fprintf(stderr, "Could not initialize libevent!\n");
+		return 1;
+	}
+	
+	int i;
+	const char **methods = event_get_supported_methods();
+	printf("Starting Libevent %s. Supported methods are:\n",
+		event_get_version());
+	for(i=0; methods[i] != NULL; ++i){
+		printf("\t%s\n", methods[i]);
+	}
+	printf("\nUsing %s.\n", event_base_get_method(base));
 	
 	// Array of possible monitoring connections
-	printf("creating arry of cons\n");
 	data_con cons[NUM_CONS];
-	printf("setting up first con\n");
 	setup_con(&(cons[0]), "Event Builder", "localhost", 8080);
-	printf("finished setting up first con\n");
+	setup_con(&(cons[1]), "Second Event Builder", "localhost", 8080);
 
 	//struct bufferevent *bev;
 	struct event *signal_event;
@@ -87,7 +109,6 @@ int main(int argc, char* argv[])
 	// Create the bases
 	base = event_base_new();
 	dns_base = evdns_base_new(base, 1);
-	printf("created bases");
 
 	// Create our sockets
 	int i;
@@ -106,27 +127,6 @@ int main(int argc, char* argv[])
 		}
 	}
 
-
-	//memset(&sin, 0, sizeof(sin));
-	//sin.sin_family = AF_INET;
-	//sin.sin_port = htons(EB_PORT); /* Port 8080 */
-	
-	//if (bufferevent_socket_connect_hostname(
-	//        bev, dns_base, AF_INET, EB_HOST, EB_PORT) < 0) {
-		/* Error connecting */
-	//	printf("Unable to connect to %s:%d\n", EB_HOST, EB_PORT);
-	//	bufferevent_free(bev);
-	//	return -1;
-	//}
-
-	//if (bufferevent_socket_connect(bev,
-	//			(struct sockaddr *)&sin, sizeof(sin)) < 0) {
-		/* Error starting connection */
-	//	printf("Unable to start connection\n");
-	//	bufferevent_free(bev);
-	//	return -1;
-	//}
-	
 	// Create a handler for SIGINT (C-c) so that quitting is nice
 	signal_event = evsignal_new(base, SIGINT, signalcb, (void *)base);
 	if (!signal_event || event_add(signal_event, NULL)<0) {
