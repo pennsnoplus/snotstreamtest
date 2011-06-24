@@ -1,2 +1,13 @@
+   _[_]_  SNO_MON - monitoring software
+    (")             for the SNO+ project
+`--( : )--'
+  (  :  )
+""`-...-'"" 
+
 to compile mon_async, run:
 	gcc -o mon_async mon_async.c -levent -L/usr/local/lib
+
+to compile fd_async, run:
+	gcc -o fd_async fd_async.c -levent -L/usr/local/lib
+
+depends upon libevent
