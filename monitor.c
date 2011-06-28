@@ -126,6 +126,7 @@ int main(int argc, char* argv[])
 void listener_cb(struct evconnlistener *listener, evutil_socket_t fd, struct sockaddr *sa,
 		int socklen, void *user_data) {
 	if (have_controller == 1) {
+		EVUTIL_CLOSESOCKET(fd); // close the connection
 		fprintf(stderr, "Already have a connected controller\n");
 		return;
 	}
