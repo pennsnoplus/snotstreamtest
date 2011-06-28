@@ -34,7 +34,7 @@ void eventcb(struct bufferevent *bev, short events, void *ptr)
 {
 	data_con con = *((data_con *)(ptr));
 	if (events & BEV_EVENT_CONNECTED) {
-		printf("Connected to %s (%s:%d).\n", con.name, con.host, con.port);
+		printf("Finished request to %s (%s:%d).\n", con.name, con.host, con.port);
 		/* Ordinarily we'd do something here, like
 		   start reading or writing. */
 		if (strncmp(con.name, "mon_control", 11) == 0) { // if the controller is connected
@@ -42,9 +42,9 @@ void eventcb(struct bufferevent *bev, short events, void *ptr)
 		}
 	} else if (events & BEV_EVENT_ERROR) {
 		/* An error occured while connecting. */
-		printf("Unable to connect to %s (%s:%d).\n", con.name, con.host, con.port);
+		printf("BEV_EVENT_ERROR: Unable to connect to %s (%s:%d).\n", con.name, con.host, con.port);
 	} else if (events & BEV_EVENT_EOF) {
-		printf("Connection to %s (%s:%d) closed.\n", con.name, con.host, con.port);
+		printf("BEV_EVENT_EOF: Connection to %s (%s:%d) closed.\n", con.name, con.host, con.port);
 	}
 }
 
@@ -95,7 +95,7 @@ int main(int argc, char* argv[])
 		printf("\t%s\n", methods[i]);
 	}
 	// Show which method the program is using
-	printf("\nUsing %s.\n", event_base_get_method(base));
+	printf("Using %s.\n", event_base_get_method(base));
 	
 	// Array of possible monitoring connections
 	data_con cons[NUM_CONS];
@@ -111,7 +111,6 @@ int main(int argc, char* argv[])
 	dns_base = evdns_base_new(base, 1);
 
 	// Create our sockets
-	int i;
 	for(i = 0; i < NUM_CONS; i++){
 		cons[i].bev = bufferevent_socket_new(base, -1, BEV_OPT_CLOSE_ON_FREE);
 
@@ -120,7 +119,7 @@ int main(int argc, char* argv[])
 
 		if(bufferevent_socket_connect_hostname(
 			cons[i].bev, dns_base, AF_INET, cons[i].host, cons[i].port)
-			< 0) {
+				< 0) {
 			printf("Unable to connect to %s (%s:%d)\n", cons[i].name, cons[i].host, cons[i].port);
 			bufferevent_free(cons[i].bev);
 		}
