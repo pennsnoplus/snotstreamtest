@@ -70,6 +70,7 @@ void signalcb(evutil_socket_t sig, short events, void *user_data){
 
 int main(int argc, char* argv[])
 {
+	int i; // counter variable
 	struct event_base *base;		// event loop
 	struct evdns_base *dns_base;	// for hostname resolution
 	
@@ -86,14 +87,14 @@ int main(int argc, char* argv[])
 		fprintf(stderr, "Could not initialize libevent!\n");
 		return 1;
 	}
-	
-	int i;
+	// Show all available methods
 	const char **methods = event_get_supported_methods();
 	printf("Starting Libevent %s. Supported methods are:\n",
 		event_get_version());
 	for(i=0; methods[i] != NULL; ++i){
 		printf("\t%s\n", methods[i]);
 	}
+	// Show which method the program is using
 	printf("\nUsing %s.\n", event_base_get_method(base));
 	
 	// Array of possible monitoring connections
@@ -101,7 +102,6 @@ int main(int argc, char* argv[])
 	setup_con(&(cons[0]), "Event Builder", "localhost", 8080);
 	setup_con(&(cons[1]), "Second Event Builder", "localhost", 8080);
 
-	//struct bufferevent *bev;
 	struct event *signal_event;
 	
 	struct sockaddr_in sin;
@@ -115,10 +115,9 @@ int main(int argc, char* argv[])
 	for(i = 0; i < NUM_CONS; i++){
 		cons[i].bev = bufferevent_socket_new(base, -1, BEV_OPT_CLOSE_ON_FREE);
 
-		bufferevent_setcb(cons[i].bev, readcb, NULL, eventcb,(void *) &cons[i]);
+		bufferevent_setcb(cons[i].bev, readcb, NULL, eventcb, (void *)&cons[i]);
 		bufferevent_enable(cons[i].bev, EV_READ|EV_WRITE); // enable read and write
 
-		//bufferevent_disable(bev, EV_WRITE);
 		if(bufferevent_socket_connect_hostname(
 			cons[i].bev, dns_base, AF_INET, cons[i].host, cons[i].port)
 			< 0) {
