@@ -3,8 +3,6 @@
 #include <string.h>
 #include <signal.h>
 
-#include <sys/socket.h>
-
 #include <event2/event.h>
 #include <event2/dns.h>
 #include <event2/bufferevent.h>
@@ -12,7 +10,9 @@
 #include <event2/util.h>
 #include <event2/listener.h>
 
-#define NUM_CONS 2 // maximum number of ports to be monitored
+#include "packet_types.h"
+
+#define NUM_CONS 3 // maximum number of ports to be monitored
 #define CONT_PORT 7999 // controller port
 
 typedef struct data_con {
@@ -68,7 +68,8 @@ int main(int argc, char* argv[])
 	// Array of possible monitoring connections
 	data_con cons[NUM_CONS];
 	setup_con(&(cons[0]), "Event Builder", "localhost", 8080);
-	setup_con(&(cons[1]), "Second Event Builder", "localhost", 8080);
+	setup_con(&(cons[1]), "XL3", "localhost", 8080);
+	setup_con(&(cons[2]), "SBC", "localhost", 8080);
 
 	// Create the bases
 	base = event_base_new();
@@ -187,7 +188,6 @@ void readcb(struct bufferevent *bev, void *ptr)
 	data_con con = *((data_con *)(ptr));
 	if (strncmp(con.name, "Controller", 10) == 0) { // if the controller is connected
 		bufferevent_write(bev, "Welcome, controller.\n", 21);
-		printf("Controller has connected\n");
 		// TODO: execute controller commands here
 	}
 	printf("--- %s ---\n", con.name);
