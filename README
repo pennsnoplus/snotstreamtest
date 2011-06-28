@@ -4,10 +4,9 @@
   (  :  )
 ""`-...-'"" 
 
-to compile mon_async, run:
-	gcc -o mon_async mon_async.c -levent -L/usr/local/lib
+To compile everything, just use 'make'.
 
-to compile fd_async, run:
-	gcc -o fd_async fd_async.c -levent -L/usr/local/lib
+SNO+_MON tries to connect to defined monitor points, and
+then takes the data from them and does stuff with it.
 
-depends upon libevent
+Yeah, that's vague, but that's the spec I have, too.
