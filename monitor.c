@@ -14,16 +14,34 @@
 
 #define NUM_CONS 3 // maximum number of ports to be monitored
 #define CONT_PORT 7999 // controller port
+// Function Pointer
+typedef void (*fp)(void);
+typedef enum {
+    // different types of connections
+	CONTROLLER,
+	EV_BUILDER,
+	XL3,
+	MTC,
+	CAEN,
+	ORCA,
+	con_type_max
+} con_type;
 
-typedef struct data_con {
+typedef struct {
 	// Holds the data for a single monitoring connection
 	struct bufferevent *bev; // holds a buffer event
-	char name[50]; // name of this connection (arbitrary)
-	char host[50]; // host (e.g., "localhost")
-	int port; // port (e.g., 8080)
+	char host[100];
+	int port;
+	con_type type;
 } data_con;
 
-void setup_con(data_con *con, char* nm, char *hst, int prt);
+typedef struct {
+    // holds a list of commands
+    char *key;
+    fp function;
+} command;
+
+void setup_con(data_con *con, char *host, int port, con_type type);
 void eventcb(struct bufferevent *bev, short events, void *ptr);
 void readcb(struct bufferevent *bev, void *ptr);
 void signalcb(evutil_socket_t sig, short events, void *user_data);
@@ -32,6 +50,17 @@ void listener_cb(struct evconnlistener *listener, evutil_socket_t fd, struct soc
 
 data_con controller_con; // the controller connection
 int have_controller = 0; // so far, we don't have one
+
+void print_connected(){
+    printf("nobody is conected\n");
+}
+void quit(){
+    exit(SIGINT);
+}
+command valid_commands[] = {
+    {"print_connected", &print_connected},
+    {"quit", &quit},
+};
 
 int main(int argc, char* argv[])
 {
@@ -62,17 +91,17 @@ int main(int argc, char* argv[])
 	for(i=0; methods[i] != NULL; ++i){
 		printf("\t%s\n", methods[i]);
 	}
+    free((char **)methods);
 	// Show which method the program is using
 	printf("Using %s.\n", event_base_get_method(base));
 
 	// Array of possible monitoring connections
 	data_con cons[NUM_CONS];
-	setup_con(&(cons[0]), "Event Builder", "localhost", 8080);
-	setup_con(&(cons[1]), "XL3", "localhost", 8080);
-	setup_con(&(cons[2]), "SBC", "localhost", 8080);
+	setup_con(&(cons[0]), "localhost", 8080, EV_BUILDER);
+	setup_con(&(cons[1]), "localhost", 8080, XL3);
+	setup_con(&(cons[2]), "localhost", 8080, MTC);
 
 	// Create the bases
-	base = event_base_new();
 	dns_base = evdns_base_new(base, 1);
 
 	// new listener to accept the controller's connection
@@ -101,7 +130,7 @@ int main(int argc, char* argv[])
 		if(bufferevent_socket_connect_hostname(
 					cons[i].bev, dns_base, AF_INET, cons[i].host, cons[i].port)
 				< 0) {
-			printf("Unable to connect to %s (%s:%d)\n", cons[i].name, cons[i].host, cons[i].port);
+			printf("Unable to connect to %s:%d (type %d)\n", cons[i].host, cons[i].port, cons[i].type);
 			bufferevent_free(cons[i].bev);
 		}
 	}
@@ -117,10 +146,11 @@ int main(int argc, char* argv[])
 	event_base_dispatch(base);
 
 	// Cleanup and finish
-	printf("Done.\n");
 	evconnlistener_free(listener); // free our listener
 	event_free(signal_event);
+    evdns_base_free(dns_base, 0);
 	event_base_free(base);
+	printf("Done.\n");
 	return 0;
 }
 
@@ -139,7 +169,7 @@ void listener_cb(struct evconnlistener *listener, evutil_socket_t fd, struct soc
 	// create the new bev_socket
 	controller_con.bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
 	// give it a name
-	setup_con(&(controller_con), "Controller", "", 0);
+	setup_con(&(controller_con), "", 0, CONTROLLER);
 	if (!controller_con.bev) {
 		fprintf(stderr, "Error constructing controller bufferevent!\n");
 		event_base_loopbreak(base);
@@ -152,32 +182,31 @@ void listener_cb(struct evconnlistener *listener, evutil_socket_t fd, struct soc
 	bufferevent_enable(controller_con.bev, EV_READ|EV_WRITE);
 }
 
-void setup_con(data_con *con, char* nm, char *hst, int prt){
+void setup_con(data_con *con, char* host, int port, con_type type){
 	// Initializes a data_con structure
-	memset(&(con->name), '\0', sizeof con->name);
 	memset(&(con->host), '\0', sizeof con->host);
-	strncpy(con->name, nm, strlen(nm));
-	strncpy(con->host, hst, strlen(hst));
-	con->port = prt;
+	strncpy(con->host, host, strlen(host));
+	con->port = port;
+    con->type = type;
 }
 
 void eventcb(struct bufferevent *bev, short events, void *ptr){
 	data_con con = *((data_con *)(ptr));
 	if (events & BEV_EVENT_CONNECTED) {
-		printf("Finished request to %s (%s:%d).\n", con.name, con.host, con.port);
+		printf("Finished request to %s:%d (type %d).\n", con.host, con.port, con.type);
 		/* Ordinarily we'd do something here, like
 		   start reading or writing. */
 	} 
 	else {
 		if (events & BEV_EVENT_ERROR) {
 			/* An error occured while connecting. */
-			printf("BEV_EVENT_ERROR: Unable to connect to %s (%s:%d).\n", con.name, con.host, con.port);
+			printf("BEV_EVENT_ERROR: Unable to connect to %s:%d (type %d).\n", con.host, con.port, con.type);
 		}
 		if (events & BEV_EVENT_EOF) {
-			if (strncmp(con.name, "Controller", 10) == 0) { // if the controller broke
+            if(con.type == CONTROLLER){
 				have_controller = 0;
 			}
-			printf("BEV_EVENT_EOF: Connection to %s (%s:%d) closed.\n", con.name, con.host, con.port);
+			printf("BEV_EVENT_EOF: Connection to %s:%d (type %d) closed.\n", con.host, con.port, con.type);
 		}
 		bufferevent_free(con.bev);
 	}
@@ -186,17 +215,35 @@ void eventcb(struct bufferevent *bev, short events, void *ptr){
 void readcb(struct bufferevent *bev, void *ptr)
 {
 	data_con con = *((data_con *)(ptr));
-	if (strncmp(con.name, "Controller", 10) == 0) { // if the controller is connected
-		bufferevent_write(bev, "Welcome, controller.\n", 21);
+    if (con.type == CONTROLLER){
+        
+		//bufferevent_write(bev, "Welcome, controller.\n", 21);
 		// TODO: execute controller commands here
 	}
-	printf("--- %s ---\n", con.name);
-	char buf[1024];
+	//printf("--- %s:%d (type %d) ---\n", con.host, con.port, con.type);
+	char combuf[1024];
 	int n;
 	struct evbuffer *input = bufferevent_get_input(bev);
-	while ((n = evbuffer_remove(input, buf, sizeof(buf))) > 0) {
-		fwrite(buf, 1, n, stdout);
+	while ((n = evbuffer_remove(input, combuf, sizeof(combuf))) > 0) {
+        // this copies the data from input to the combuf
+		//fwrite(combuf, 1, n, stdout);
 	}
+    //putc('\n', stdout);
+    printf("command: %s\n", combuf);
+    int i;
+    command com;
+    int is_valid = 0;
+    for (i = 0; i < sizeof(valid_commands)/sizeof(command); i++){
+        com = valid_commands[i];
+        if (strncmp(com.key, combuf, strlen(com.key)) == 0){
+            printf("Valid command %s=%s.\n", combuf,com.key);
+            com.function();
+            is_valid++;
+        }
+    }
+    if (!is_valid){
+        printf("%s is not a valid command.\n", combuf);
+    }
 }
 
 void signalcb(evutil_socket_t sig, short events, void *user_data){
