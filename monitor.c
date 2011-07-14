@@ -15,7 +15,7 @@
 #define NUM_CONS 3 // maximum number of ports to be monitored
 #define CONT_PORT 7999 // controller port
 // Function Pointer
-typedef void (*fp)(void);
+
 typedef enum {
     // different types of connections
 	CONTROLLER,
@@ -38,7 +38,7 @@ typedef struct {
 typedef struct {
     // holds a list of commands
     char *key;
-    fp function;
+    void (*function)(void);
 } command;
 
 void setup_con(data_con *con, char *host, int port, con_type type);
@@ -55,7 +55,7 @@ void print_connected(){
     printf("nobody is conected\n");
 }
 void quit(){
-    exit(SIGINT);
+    raise(SIGINT);
 }
 command valid_commands[] = {
     {"print_connected", &print_connected},
