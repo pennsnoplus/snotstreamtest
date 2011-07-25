@@ -199,7 +199,64 @@ static void echo_read_cb(struct bufferevent *bev, void *ctx) {
 	while (evbuffer_get_length(input) >= con->pktsize && n > 0) {
 		memset(&data_pkt, 0, con->pktsize);
 		n = evbuffer_remove(input, data_pkt, con->pktsize);
+		if (con->con_type == XL3){
+			XL3_Packet *xpkt = (XL3_Packet *)data_pkt;
+			XL3_CommandHeader cmhdr = (XL3_CommandHeader)xpkt->cmdHeader;
+			PMTBundle *bndl_array = (PMTBundle *)(xpkt->payload);
+			int i;
+			for(i = 0; i < sizeof(bndl_array)/sizeof(PMTBundle); i++){
+				PMTBundle bndl = bndl_array[i];
+				// GTID
+				char gtid[24];
+				memcpy(gtid, &bndl.word1, 16);
+				memcpy(gtid+16, &bndl.word3+12, 4);
+				memcpy(gtid+20, &bndl.word3+28, 4);
+				// Channel number
+				char channel_number[5];
+				memcpy(channel_number, &bndl.word1+16, 5);
+				// Crate Address
+				char crate_address[5];
+				memcpy(crate_address, &bndl.word1+21, 5);
+				// Board Address
+				char board_address[4];
+				memcpy(board_address, &bndl.word1+26, 4);
+				// CGT24 SYNCLEAR16
+				char cgt_es16[1];
+				memcpy(cgt_es16, &bndl.word1+30, 1);
+				// CGT24 SYNCLEAR24
+				char cgt_es24[1];
+				memcpy(cgt_es24, &bndl.word1+31, 1);
+				// ADC_QLX
+				char adc_qlx[12];
+				memcpy(adc_qlx, &bndl.word2+0, 12);
+				// CMOS Cell Address
+				char cmos_cell_address[4];
+				memcpy(cmos_cell_address, &bndl.word2+12, 4);
+				// ADC_QHS
+				char adc_qhs[12];
+				memcpy(adc_qhs, &bndl.word2+16, 12);
+				// Miss Count Flag
+				char miss_count_flag[1];
+				memcpy(miss_count_flag, &bndl.word2+28, 1);
+				// NC_CC
+				char nc_cc[1];
+				memcpy(nc_cc, &bndl.word2+29, 1);
+				// LGISELECT
+				char lgi_select[1];
+				memcpy(lgi_select, &bndl.word2+30, 1);
+				// CMOS SYNCLEAR16
+				char cmos_es16[1];
+				memcpy(cmos_es16, &bndl.word2+31, 1);
+				// ADC_QHL
+				char adc_qhl[12];
+				memcpy(adc_qhl, &bndl.word3+0, 12);
+				// ADC_TAC
+				char adc_taq[12];
+				memcpy(adc_taq, &bndl.word3+16, 12);
+			}
+		}
 
+		/*
 		JsonNode *dict = json_mkobject();
 		json_append_member(dict, "datapkt", json_mkstring(data_pkt));
 		char *datastr = json_encode(dict);
@@ -209,7 +266,7 @@ static void echo_read_cb(struct bufferevent *bev, void *ctx) {
 
 		json_delete(dict);
 		free(datastr);
-
+		*/
 		printf("Data packet (%d bytes): ", (int)strlen(data_pkt));
 		puts(data_pkt);
 	}

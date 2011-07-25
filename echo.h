@@ -17,7 +17,7 @@ size_t pkt_size_of[] =
 {
 	0,
 	0,
-	5,						//sizeof xl3Packet,
+	sizeof(XL3_Packet),
 	sizeof(mtcPacket),
 	sizeof(caenPacket),
 	0

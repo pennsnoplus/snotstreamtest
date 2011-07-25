@@ -45,4 +45,24 @@ typedef struct xl3Packet { // XL3 data
 	char head[4];
 	char body[1440];
 } xl3Packet;
-/* Prototypes */
+
+typedef struct {
+    //uint32_t destination;
+    uint16_t packet_num;
+    uint8_t packet_type;
+    uint8_t num_bundles;
+    //uint32_t numberBytesinPayload;
+} XL3_CommandHeader;
+
+typedef struct {
+    //uint32_t numBytes;                //filled in automatically
+    XL3_CommandHeader cmdHeader;
+    //char payload[kSBC_MaxPayloadSizeBytes];
+	char payload[1024*400];
+} XL3_Packet;
+
+typedef struct {
+    uint32_t word1;
+    uint32_t word2;
+    uint32_t word3;
+} PMTBundle;
