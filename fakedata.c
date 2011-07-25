@@ -116,7 +116,8 @@ static void listener_cb(struct evconnlistener *listener, evutil_socket_t fd,stru
 
 	int i;
 	for(i=0; i<5; i++){
-		bufferevent_write(bev, MESSAGE, strlen(MESSAGE));
+		bufferevent_write(bev, MESSAGE, 5);
+        printf("wrote message %d\n", i);
 	}
 }
 

@@ -20,8 +20,8 @@
         NOPE //- do nothing until the controller is accepted
     3. Run the main loop (event_base_dispatch base)
         - accept controller commands:
-            - CREATE/DELETE connections
-            - SHOW          all connections
+            BOOM - CREATE/DELETE connections
+            BOOM - SHOW          all connections
             - DEBUG         connections
         - get data from connections (filter buffers?)
             - switch on the connection type, but basically:
