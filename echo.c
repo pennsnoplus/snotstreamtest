@@ -14,7 +14,8 @@
 #include <signal.h>
 
 #include "echo.h"
-
+#include "pouch.h"
+#include "json.h"
 
 void connection_free(connection * con) {
 	if (con->type)
@@ -190,13 +191,31 @@ static void echo_read_cb(struct bufferevent *bev, void *ctx) {
 	//evbuffer_add_buffer(output, input);
 	connection *con = (connection *) ctx;
 	char data_pkt[con->pktsize];
+	
+	//create a pouch_request* object
+	pouch_request *pr = pr_init();
+	
 	int n = 1;
 	while (evbuffer_get_length(input) >= con->pktsize && n > 0) {
 		memset(&data_pkt, 0, con->pktsize);
 		n = evbuffer_remove(input, data_pkt, con->pktsize);
+
+		JsonNode *dict = json_mkobject();
+		json_append_member(dict, "datapkt", json_mkstring(data_pkt));
+		char *datastr = json_encode(dict);
+		
+		pr = doc_create(pr, "http://peterldowns:2rlz54NeO3@peterldowns.cloudant.com", "testing", datastr);
+		pr_do(pr);
+
+		json_delete(dict);
+		free(datastr);
+
 		printf("Data packet (%d bytes): ", (int)strlen(data_pkt));
 		puts(data_pkt);
 	}
+	
+	// get rid of the pouch object
+	pr_free(pr);
 }
 
 static void echo_event_cb(struct bufferevent *bev, short events, void *ctx) {
