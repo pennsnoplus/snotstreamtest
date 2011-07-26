@@ -1,3 +1,20 @@
+typedef struct {
+    uint16_t packet_num;
+    uint8_t packet_type;
+    uint8_t num_bundles;
+} XL3_CommandHeader;
+
+typedef struct {
+    XL3_CommandHeader cmdHeader;
+	char payload[1440];
+} XL3_Packet; // 1444 bytes = 1440 (payload) + 4 (header)
+
+typedef struct {
+    uint32_t word1;
+    uint32_t word2;
+    uint32_t word3;
+} PMTBundle;
+
 typedef struct caenPacket { // CAEN data
 	char head[4];
 	char body[1760];
@@ -7,33 +24,3 @@ typedef struct mtcPacket { // MTC data
 	char head[4];
 	char body[192];
 } mtcPacket;
-
-typedef struct xl3Packet { // XL3 data
-	char head[4];
-	char body[1440];
-} xl3Packet;
-
-/*
-   Different types of monitoring connections
- */
-typedef enum {
-	EV_BUILDER, // TODO: EV_BUILDER data
-	XL3,
-	MTC,
-	CAEN,
-	ORCA,       // TODO: ORCA data
-    UNKNOWN,    // TODO: default size
-	con_type_max
-} con_type;
-/*
-   Sizes of different packet types
-   (con_size_of[EV_BUILDER]);
- */
-int con_size_of = {
-    0,
-    sizeof xl3Packet,
-    sizeof mtcPacket,
-    sizeof caenPacket,
-    0,
-    0
-}

@@ -16,7 +16,8 @@
 #include <event2/util.h>
 #include <event2/event.h>
 
-#include "monitor.h"
+#include "pkt_types.h"
+#include "pkt_utils.h"
 
 static const char MESSAGE[] = "Hello, World!\n";
 

@@ -1,3 +1,12 @@
+// Standard Libraries
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
+#include <signal.h>
+#include <arpa/inet.h>
+
+// Libevent
 #include <event2/listener.h>
 #include <event2/bufferevent.h>
 #include <event2/buffer.h>
@@ -5,19 +14,12 @@
 #include <event2/util.h>
 #include <event2/event.h>
 
-#include <arpa/inet.h>
-
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <errno.h>
-#include <signal.h>
-
+// Custom
 #include "echo.h"
-#include "pouch.h"
-#include "json.h"
+#include "lib/json/json.h"
+#include "lib/pouch/pouch.h"
 
-void connection_free(connection * con) {
+void delete_con(connection * con) {
 	if (con->type)
 		free(con->type);
 	if (con->host)
@@ -31,7 +33,15 @@ void connection_free(connection * con) {
 	}
 }
 
-void print_connections(void) {
+void show_coms(char *UNUSED, void *_UNUSED){
+	int i;
+	puts("Commands:");
+	for(i = 0; controller_coms[i].key; i++){
+		puts(controller_coms[i].key);
+	}
+}
+
+void print_cons(char *UNUSED, void *_UNUSED) {
 	if (cur_mon_con != 0) {
 		printf("cur_mon_con= %d\n", cur_mon_con);
 		int i;
@@ -48,15 +58,15 @@ void print_connections(void) {
 	}
 }
 
-void stop_connection(char *inbuf) {
+void stop_con(char *inbuf, void *UNUSED) {
 	if (!cur_mon_con)
 		printf("No connections to stop.\n");
 	else {
 		char *type;
 		char *host;
 		char *portstr;
-		portstr = strtok(inbuf, " ");	// get rid of command name
 		int i;
+		portstr = strtok(inbuf, " "); // get rid of command name
 		for (i = 0; i < 3 && portstr != NULL; i++) {
 			portstr = strtok(NULL, " ");
 			if (portstr == NULL)
@@ -84,7 +94,7 @@ void stop_connection(char *inbuf) {
 							     con->type,
 							     con->host,
 							     con->port);
-							connection_free(con);
+							delete_con(con);
 							break;
 						}
 					}
@@ -94,7 +104,7 @@ void stop_connection(char *inbuf) {
 	}
 }
 
-void start_connection(char *inbuf) {
+void start_con(char *inbuf, void *UNUSED) {
 	if (cur_mon_con < MAX_MON_CONS) {	// we can still make new cons
 		connection *con = &monitoring_cons[cur_mon_con];
 		con->bev =
@@ -106,8 +116,8 @@ void start_connection(char *inbuf) {
 		char *type;
 		char *host;
 		char *portstr;
-		portstr = strtok(inbuf, " ");	// get rid of command name
 		int i;
+		portstr = strtok(inbuf, " "); // get rid of command name
 		for (i = 0; i < 3 && portstr != NULL; i++) {
 			portstr = strtok(NULL, " ");
 			if (portstr == NULL)
@@ -131,12 +141,7 @@ void start_connection(char *inbuf) {
 			}
 			con->type = (char *)malloc(strlen(lowercase) + 1);
 			strcpy(con->type, lowercase);
-			puts(con->type);
-			puts(lowercase);
-			puts(type);
-			if (!strcmp(con->type, "controller")) {
-				con->con_type = CONTROLLER;
-			} else if (!strcmp(con->type, "ev_builder")) {
+			if (!strcmp(con->type, "ev_builder")) {
 				con->con_type = EV_BUILDER;
 			} else if (!strcmp(con->type, "xl3")) {
 				con->con_type = XL3;
@@ -171,7 +176,7 @@ void start_connection(char *inbuf) {
 				}
 			} else {
 				printf("Unable to create socket\n");
-				connection_free(con);
+				delete_con(con);
 			}
 		}
 	}
@@ -186,6 +191,7 @@ void signalcb(evutil_socket_t sig, short events, void *user_data) {
 
 /* Data callback */
 static void echo_read_cb(struct bufferevent *bev, void *ctx) {
+	//TODO: rename echo_read_cb
 	/* This callback is invoked when there is data to read on bev. */
 	struct evbuffer *input = bufferevent_get_input(bev);
 	//struct evbuffer *output = bufferevent_get_output(bev);
@@ -199,6 +205,7 @@ static void echo_read_cb(struct bufferevent *bev, void *ctx) {
 	pouch_request *pr = pr_init();
 	int n = 1;
 	while (evbuffer_get_length(input) >= con->pktsize && n > 0) {
+		//TODO: spawn a new thread here. (pthread vs. fork?)
 		memset(&data_pkt, 0, con->pktsize);
 		n = evbuffer_remove(input, data_pkt, con->pktsize);
 		if (con->con_type == XL3){
@@ -217,6 +224,7 @@ static void echo_read_cb(struct bufferevent *bev, void *ctx) {
 				uint32_t crate,slot,chan,gt8,gt16,cmos_es16,cgt_es16,cgt_es8,nc_cc;
 				int cell;
 				double qlx, qhs, qhl, tac;
+				// TODO: add gt24
 				crate = (uint32_t) UNPK_CRATE_ID(bndl);
 				json_append_member(data, "crate", json_mknumber(crate));
         		slot = (uint32_t)  UNPK_BOARD_ID(bndl);
@@ -277,41 +285,38 @@ static void echo_event_cb(struct bufferevent *bev, short events, void *ctx) {
 	if (events & BEV_EVENT_ERROR)
 		perror("Error from bufferevent");
 	if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) {
-		connection_free((connection *) ctx);
+		delete_con((connection *) ctx);
 	}
 }
 
 /* Controller callbacks */
 static void controller_cb_read(struct bufferevent *bev, void *ctx) {
 	struct evbuffer *input = bufferevent_get_input(bev);
-
-	char inbuf[100];
-	memset(&inbuf, 0, 100);
-
+	char inbuf[100]; // arbitrary sizing
+	memset(&inbuf, 0, sizeof(inbuf));
 	int n;
 	while ((n = evbuffer_remove(input, inbuf, sizeof(inbuf))) > 0) {
 		// this copies the data from input to the inbuf
 	}
 	printf("Controller: %s", inbuf);
+	
 	if (inbuf[strlen(inbuf) - 1] != '\n')
 		fputc('\n', stdout);
-	if (!strncmp("print_connections", inbuf, 17))
-		print_connections();
-	else if (!strncmp("stop", inbuf, 4)) {
-		stop_connection(inbuf);
-	} else if (!strncmp("start", inbuf, 5)) {
-		start_connection(inbuf);
-		//bev = bufferevent_socket_new(base, -1, BEV_OPT_CLOSE_ON_FREE);
-		//bufferevent_setcb(bev, echo_read_cb, NULL, echo_event_cb, base);
-		//bufferevent_enable(bev, EV_READ|EV_WRITE);
-		//evbuffer_add_printf(bufferevent_get_output(bev), "GET %s\r\n", argv[2]);
-		//bufferevent_socket_connect_hostname(bev, dnsbase, AF_UNSPEC, argv[1], 80);
-		//bufferevent_socket_connect_hostname(bev, dnsbase, AF_UNSPEC, "localhost", 4040);
+	char dup[sizeof(inbuf)];
+	memset(&dup, 0, sizeof(dup));
+	strncpy(dup, inbuf, sizeof(dup));
+	char *com_key = strtok(dup, " "); // get the command name
+	// TODO: fix the whole strtok/command parsing thing.
+	int i;
+	for(i = 0; controller_coms[i].key; i++){
+		if(!strncmp(com_key, controller_coms[i].key, strlen(controller_coms[i].key))){
+			controller_coms[i].function(inbuf, NULL);
+			break;
+		}
 	}
 }
 
-static void controller_cb_event(struct bufferevent *bev, short events,
-				void *ctx) {
+static void controller_cb_event(struct bufferevent *bev, short events,void *ctx) {
 	if (events & BEV_EVENT_ERROR)
 		perror("Error from bufferevent (controller)");
 	if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) {
