@@ -58,8 +58,8 @@ typedef struct {
     //uint32_t numBytes;                //filled in automatically
     XL3_CommandHeader cmdHeader;
     //char payload[kSBC_MaxPayloadSizeBytes];
-	char payload[1024*400];
-} XL3_Packet;
+	char payload[1440];
+} XL3_Packet; // 1444 bytes = 1440 (payload) + 4 (header)
 
 typedef struct {
     uint32_t word1;

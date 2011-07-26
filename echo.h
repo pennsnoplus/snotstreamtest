@@ -1,5 +1,5 @@
 #include "monitor.h"
-
+#include "Record_Info.h"
 #define MAX_MON_CONS 10
 
 /* Structs */

@@ -16,6 +16,8 @@
 #include <event2/util.h>
 #include <event2/event.h>
 
+#include "monitor.h"
+
 static const char MESSAGE[] = "Hello, World!\n";
 
 static const int PORT = 8080;
@@ -115,10 +117,21 @@ static void listener_cb(struct evconnlistener *listener, evutil_socket_t fd,stru
 	bufferevent_disable(bev, EV_READ);
 
 	int i;
-	for(i=0; i<5; i++){
-		bufferevent_write(bev, MESSAGE, 5);
-        printf("wrote message %d\n", i);
+	int j = 0;
+	for(i=0; i<(sizeof(XL3_Packet)/2); i++){
+		bufferevent_write(bev, "1", 1);
+		j++;
+		bufferevent_write(bev, "0", 1);
+		j++;
 	}
+	printf("wrote message\n");
+	//for(i = 0; i<j; i++){
+		//putc('1', stdout);
+		//putc('0', stdout);
+	//}
+	//printf("i = %d\n", i);
+	//printf("j = %d\n", j);
+	putc('\n', stdout);
 }
 
 static void conn_writecb(struct bufferevent *bev, void *user_data) {
