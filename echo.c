@@ -186,7 +186,6 @@ void start_con(char *inbuf, void *UNUSED) {
 
 // Data Callbacks
 static void data_read_cb(struct bufferevent *bev, void *ctx) {
-	//TODO: rename data_read_cb
 	/* This callback is invoked when there is data to read on bev. */
 	struct evbuffer *input = bufferevent_get_input(bev);
 	//struct evbuffer *output = bufferevent_get_output(bev);
@@ -201,8 +200,10 @@ static void data_read_cb(struct bufferevent *bev, void *ctx) {
 	int n = 1;
 	while (evbuffer_get_length(input) >= con->pktsize && n > 0) {
 		//TODO: spawn a new thread here. (pthread vs. fork?)
+		//TODO: make a separate function for each type of data upload, so that threading is easier/more logical
 		memset(&data_pkt, 0, con->pktsize);
 		n = evbuffer_remove(input, data_pkt, con->pktsize);
+		printf("Received data packet (%d bytes)\n", con->pktsize);
 		if (con->con_type == XL3){
 			printf("XL3 packet!\n");
 			XL3_Packet *xpkt = (XL3_Packet *)data_pkt;
@@ -211,67 +212,58 @@ static void data_read_cb(struct bufferevent *bev, void *ctx) {
 			int i;
 			JsonNode *data;
 			for(i = 0; i < sizeof(xpkt->payload)/sizeof(PMTBundle); i++){
-				//printf("packing %d of %d\n", i, (int)(sizeof(xpkt->payload)/sizeof(PMTBundle)));
-				data = json_mkobject();
-				//PMTBundle bndl = bndl_array[i];
+				// fill the bundle
 				uint32_t bndl[3];
-				memcpy(bndl, &bndl_array[i], 3*sizeof(uint32_t));//= bndl_array[i];
-				uint32_t crate,slot,chan,gt8,gt16,cmos_es16,cgt_es16,cgt_es8,nc_cc;
-				int cell;
-				double qlx, qhs, qhl, tac;
-				// TODO: add gt24
-				crate = (uint32_t) UNPK_CRATE_ID(bndl);
-				json_append_member(data, "crate", json_mknumber(crate));
-        		slot = (uint32_t)  UNPK_BOARD_ID(bndl);
-				json_append_member(data, "slot", json_mknumber(slot));
-        		chan = (uint32_t)  UNPK_CHANNEL_ID(bndl);
+				memcpy(bndl, &bndl_array[i],sizeof(bndl));
+				// unpack the bundle
+				uint32_t chan,cell,gt24,gt16,gt8,qlx,qhs,qhl,tac,cmos16,cgt16,cgt24,missed,lgi,nc_cc,crate,board;
+				chan = (uint32_t) UNPK_CHANNEL_ID(bndl);
+                cell = (uint32_t) UNPK_CELL_ID(bndl);
+                gt24 = (uint32_t) UNPK_FEC_GT24_ID(bndl);
+				gt16 = (uint32_t) UNPK_FEC_GT16_ID(bndl);
+				gt8 = (uint32_t) UNPK_FEC_GT8_ID(bndl);
+                qlx = (uint32_t) UNPK_QLX(bndl);
+                qhs = (uint32_t) UNPK_QHS(bndl);
+                qhl = (uint32_t) UNPK_QHL(bndl);
+                tac = (uint32_t) UNPK_TAC(bndl);
+                cmos16 = (uint32_t) UNPK_CMOS_ES_16(bndl);
+                cgt16 = (uint32_t) UNPK_CGT_ES_16(bndl);
+                cgt24 = (uint32_t) UNPK_CGT_ES_24(bndl);
+                missed = (uint32_t) UNPK_MISSED_COUNT(bndl);
+                lgi = (uint32_t) UNPK_LGI_SELECT(bndl);
+                nc_cc = (uint32_t) UNPK_NC_CC(bndl);
+                crate = (uint32_t) UNPK_CRATE_ID(bndl);
+                board = (uint32_t) UNPK_BOARD_ID(bndl);
+				// create the JSON object
+				data = json_mkobject();
 				json_append_member(data, "chan", json_mknumber(chan));
-        		cell = (int) UNPK_CELL_ID(bndl);
 				json_append_member(data, "cell", json_mknumber(cell));
-        		gt8 = (uint32_t)   UNPK_FEC_GT8_ID(bndl);
-				json_append_member(data, "gt8", json_mknumber(gt8));
-        		gt16 = (uint32_t)  UNPK_FEC_GT16_ID(bndl);
+				json_append_member(data, "gt24", json_mknumber(gt24));
 				json_append_member(data, "gt16", json_mknumber(gt16));
-        		cmos_es16 = (uint32_t) UNPK_CMOS_ES_16(bndl);
-				json_append_member(data, "cmos_es16", json_mknumber(cmos_es16));
-        		cgt_es16 = (uint32_t)  UNPK_CGT_ES_16(bndl);
-				json_append_member(data, "cgt_es16", json_mknumber(cgt_es16));
-        		cgt_es8 = (uint32_t)   UNPK_CGT_ES_24(bndl);
-				json_append_member(data, "cgt_es8", json_mknumber(cgt_es8));
-        		nc_cc = (uint32_t) UNPK_NC_CC(bndl);
-				json_append_member(data, "nc_cc", json_mknumber(nc_cc));
-        		qlx = (double) MY_UNPK_QLX(bndl);
+				json_append_member(data, "gt8", json_mknumber(gt8));
 				json_append_member(data, "qlx", json_mknumber(qlx));
-        		qhs = (double) UNPK_QHS(bndl);
 				json_append_member(data, "qhs", json_mknumber(qhs));
-        		qhl = (double) UNPK_QHL(bndl);
 				json_append_member(data, "qhl", json_mknumber(qhl));
-        		tac = (double) UNPK_TAC(bndl);
 				json_append_member(data, "tac", json_mknumber(tac));
+				json_append_member(data, "cmos16", json_mknumber(cmos16));
+				json_append_member(data, "cgt16", json_mknumber(cgt16));
+				json_append_member(data, "cgt24", json_mknumber(cgt24));
+				json_append_member(data, "missed", json_mknumber(missed));
+				json_append_member(data, "lgi", json_mknumber(lgi));
+				json_append_member(data, "nc_cc", json_mknumber(nc_cc));
+				json_append_member(data, "crate", json_mknumber(crate));
+				json_append_member(data, "board", json_mknumber(board));
+				// send the data
 				char *datastr = json_encode(data);
 				pr = doc_create(pr, "http://peterldowns:2rlz54NeO3@peterldowns.cloudant.com", "testing", datastr);
 				pr_do(pr);
+				// clean up
 				json_delete(data);
 				free(datastr);
 			}
 			printf("finished XL3\n");
 		}
-
-		/*
-		JsonNode *dict = json_mkobject();
-		json_append_member(dict, "datapkt", json_mkstring(data_pkt));
-		char *datastr = json_encode(dict);
-		
-		pr = doc_create(pr, "http://peterldowns:2rlz54NeO3@peterldowns.cloudant.com", "testing", datastr);
-		pr_do(pr);
-
-		json_delete(dict);
-		free(datastr);
-		*/
-		printf("Data packet (%d bytes): ", (int)strlen(data_pkt));
-		//puts(data_pkt);
 	}
-	
 	// get rid of the pouch object
 	pr_free(pr);
 }
@@ -353,11 +345,6 @@ void signal_cb(evutil_socket_t sig, short events, void *user_data) {
 	printf("Caught an interrupt signal; exiting.\n");
 	event_base_loopbreak(base);
 }
-
-
-
-
-
 
 int main(int argc, char **argv) {
 	// Setup the port
