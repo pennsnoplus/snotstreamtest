@@ -1,5 +1,5 @@
 ```
-_[_]_  SNO+_MON + monitoring software
+   _[_]_  SNO+_MON + monitoring software
     (")             for the SNO+ project
 `++( : )++'
   (  :  )
@@ -49,9 +49,9 @@ Yeah, that's vague, but that's the spec I have, too.
             + check to see how much data is in the buffer (DONE)
             + if there is enough data to fill a packet (DONE)
                 + fill CONNECTION_TYPE packet (DONE)
-                + if DEBUG:
-                    + show data, information about data
+                + if DEBUG: show data, information about data
                 + UPLOAD to database (DONE)
+
 ### Callbacks ###
 1. READ
     + uploads the data
