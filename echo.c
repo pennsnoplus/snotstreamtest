@@ -87,7 +87,7 @@ void print_cons(char *UNUSED, void *_UNUSED) {
 	int i;
 	connection *con;
 	puts("Connections:\n");
-	for (i = 0; i < cur_mon_con; i++) {
+	for (i = 0; i < MAX_MON_CONS; i++) {
 		con = &monitoring_cons[i];
 		if (con->valid) {
 			printf("\t%s %s:%d\n", get_con_typestr(con->type), con->host,
@@ -446,8 +446,11 @@ int main(int argc, char **argv) {
 	// Run the main loop
 	event_base_dispatch(base);
 	
-	// TODO: delete all cons that are valid
 	// Clean up
+	for(cur_mon_con=0;cur_mon_con<MAX_MON_CONS;cur_mon_con++){
+		if(monitoring_cons[cur_mon_con].valid)
+			delete_con(&monitoring_cons[cur_mon_con]);
+	}
 	event_del(signal_event);
 	free(signal_event);
 	evdns_base_free(dnsbase, 0);
