@@ -24,7 +24,6 @@
 
 // Helper Functions
 void delete_con(connection * con) {
-	printf("Closed %s %s:%d\n", get_con_typestr(con->type), con->host, con->port);
 	if (con->host)
 		free(con->host);
 	if (con->bev)
@@ -77,7 +76,6 @@ char *get_con_typestr(con_type type){
 // Commands
 void help(char *UNUSED, void *_UNUSED){
 	int i;
-	puts("Commands:");
 	for(i = 0; controller_coms[i].key; i++){
 		printf("\t%s\n", controller_coms[i].key);
 	}
@@ -86,7 +84,6 @@ void help(char *UNUSED, void *_UNUSED){
 void print_cons(char *UNUSED, void *_UNUSED) {
 	int i;
 	connection *con;
-	puts("Connections:\n");
 	for (i = 0; i < MAX_MON_CONS; i++) {
 		con = &monitoring_cons[i];
 		if (con->valid) {
@@ -101,17 +98,9 @@ void stop_con(char *inbuf, void *UNUSED) {
 	char *host;
 	char *portstr;
 	int i;
-	portstr = strtok(inbuf, " "); // get rid of command name
-	for (i = 0; i < 3 && portstr != NULL; i++) {
-		portstr = strtok(NULL, " ");
-		if (portstr == NULL)
-			break;
-		if (i == 0)
-			type = portstr;
-		else if (i == 1)
-			host = portstr;
-	}
-	if (i != 3) {
+	if (!(type = strtok(inbuf, " ")) ||
+		!(host = strtok(NULL, " ")) ||
+		!(portstr = strtok(NULL, " "))){
 		printf("Incorrect number of arguments\n");
 		printf("stop <type> <host> <port>\n");
 		return;
@@ -138,19 +127,11 @@ void start_con(char *inbuf, void *UNUSED) {
 	char *host;
 	char *portstr;
 	int i;
-	portstr = strtok(inbuf, " "); // get rid of command name
-	for (i = 0; i < 3 && portstr != NULL; i++) {
-		portstr = strtok(NULL, " ");
-		if (portstr == NULL)
-			break;
-		if (i == 0)
-			type = portstr;
-		else if (i == 1)
-			host = portstr;
-	}
-	if (i != 3) { // make sure there are enough arguments
+	if (!(type = strtok(inbuf, " ")) ||
+		!(host = strtok(NULL, " ")) ||
+		!(portstr = strtok(NULL, " "))){
 		printf("Incorrect number of arguments\n");
-		printf("create <type> <host> <port>\n");
+		printf("stop <type> <host> <port>\n");
 		return;
 	}
 	if (cur_mon_con >= MAX_MON_CONS){ // make sure there are enough free cons
@@ -267,15 +248,10 @@ static void data_read_cb(struct bufferevent *bev, void *ctx) {
 	//create a pouch_request* object
 	int n = 1;
 	while (evbuffer_get_length(input) >= con->pktsize && n > 0) {
-		printf("%d\n", (int)con->pktsize);
-		printf("EV_BUILDER: %d\n", (int)pkt_size_of[EV_BUILDER]);
-		printf("XL3: %d\n", (int)pkt_size_of[XL3]);
-		printf("MTC: %d\n", (int)pkt_size_of[MTC]);
-		printf("CAEN: %d\n", (int)pkt_size_of[CAEN]);
 		memset(&data_pkt, 0, con->pktsize);
 
 		n = evbuffer_remove(input, data_pkt, con->pktsize);
-		printf("Received data packet (%d bytes)\n", (int)(con->pktsize));
+		printf("Processing %s data packet (%d bytes)\n", get_con_typestr(con->type), (int)(con->pktsize));
 
 		// build a temporary packet for each thread
 		char *tmp_pkt = (char *)malloc(con->pktsize);
@@ -286,7 +262,7 @@ static void data_read_cb(struct bufferevent *bev, void *ctx) {
 		memcpy(tmp_pkt, &data_pkt, con->pktsize);
 
 		pthread_t thread;
-		int rc;
+		int rc=0;
 		switch (con->type){
 			case XL3:
 				rc = pthread_create(&thread, NULL, handle_xl3, (void *)tmp_pkt);
@@ -298,6 +274,7 @@ static void data_read_cb(struct bufferevent *bev, void *ctx) {
 		if (rc) {
 			fprintf(stderr, "ERROR: return code from pthread_create() is %d\n", rc);
 		}
+		
 	}
 }
 
@@ -305,6 +282,8 @@ static void data_event_cb(struct bufferevent *bev, short events, void *ctx) {
 	if (events & BEV_EVENT_ERROR)
 		perror("Error from bufferevent");
 	if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) {
+		connection *con = (connection *)ctx;
+		fprintf(stderr, "Received EOF or error: closing %s connection to %s:%d\n", get_con_typestr(con->type),con->host,con->port);
 		delete_con((connection *)ctx);
 	}
 }
@@ -326,11 +305,13 @@ static void controller_read_cb(struct bufferevent *bev, void *ctx) {
 	memset(&dup, 0, sizeof(dup));
 	strncpy(dup, inbuf, sizeof(dup));
 	char *com_key = strtok(dup, " "); // get the command name
-	// TODO: fix the whole strtok/command parsing thing.
+	char *args = strchr(inbuf, ' ');
+	if(args)
+		args++; // get rid of the space at the beginning of commands
 	int i;
 	for(i = 0; controller_coms[i].key; i++){
 		if(!strncmp(com_key, controller_coms[i].key, strlen(controller_coms[i].key))){
-			controller_coms[i].function(inbuf, NULL);
+			controller_coms[i].function(args, NULL);
 			break;
 		}
 	}

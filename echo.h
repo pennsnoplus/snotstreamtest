@@ -29,9 +29,9 @@ size_t pkt_size_of[] =
 {
 	0,
 	sizeof(XL3_Packet),
-	0,
 	sizeof(mtcPacket),
 	sizeof(caenPacket),
+	0,
 	0
 };
 typedef void(*com_ptr)(char *, void *); // command pointer
