@@ -24,38 +24,38 @@ Yeah, that's vague, but that's the spec I have, too.
 			+ hiperfifo.c
 
 ## Structure ##
-1. Main
-    1. Set up an event_base (DONE)
-        + only use epoll & kqueue (DONE)
-        + create the config (DONE)
-        + create the base (DONE)
-        + delete the config (DONE)
-    2. Setup a dns_base (DONE)
-        + make it asynchronous
-        + this way, we can resolve hostnames asynchronously,
-          as opposed to blocking on resolves.
-    2. Create a listener (DONE)
-        + be ready to accept a controller (DONE)
-        NOPE //+ do nothing until the controller is accepted
-			+ have default connections?
-    3. Run the main loop (event_base_dispatch base)
-        + accept controller commands: (DONE)
-            + CREATE/DELETE connections (DONE)
-            + SHOW          all connections (DONE)
-			+ HELP			get list of valid commands
-        + get data from connections (filter buffers?) (DONE)
-            + switch on the connection type, but basically: (DONE)
-                + check to see how much data is in the buffer (DONE)
-                + if there is enough data to fill a packet (DONE)
-                    + fill CONNECTION_TYPE packet (DONE)
-                    + if DEBUG:
-                        + show data, information about data
-                    + UPLOAD to database (DONE)
-2. Callbacks
-    1. READ
-        + uploads the data
-    2. WRITE
-        + "successful write to <place>"
-    3. EVENT
-        + nothing?
+`Main`
+1. Set up an event_base (DONE)
+    + only use epoll & kqueue (DONE)
+    + create the config (DONE)
+    + create the base (DONE)
+    + delete the config (DONE)
+2. Setup a dns_base (DONE)
+    + make it asynchronous
+    + this way, we can resolve hostnames asynchronously,
+      as opposed to blocking on resolves.
+2. Create a listener (DONE)
+    + be ready to accept a controller (DONE)
+    NOPE //+ do nothing until the controller is accepted
+ have default connections?
+3. Run the main loop (event_base_dispatch base)
+    + accept controller commands: (DONE)
+        + CREATE/DELETE connections (DONE)
+        + SHOW          all connections (DONE)
+ HELP			get list of valid commands
+    + get data from connections (filter buffers?) (DONE)
+        + switch on the connection type, but basically: (DONE)
+            + check to see how much data is in the buffer (DONE)
+            + if there is enough data to fill a packet (DONE)
+                + fill CONNECTION_TYPE packet (DONE)
+                + if DEBUG:
+                    + show data, information about data
+                + UPLOAD to database (DONE)
+`Callbacks`
+1. READ
+    + uploads the data
+2. WRITE
+    + "successful write to <place>"
+3. EVENT
+    + nothing?
 
