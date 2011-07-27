@@ -49,22 +49,22 @@ typedef struct {
 void start_con(char *inbuf, void *UNUSED);
 void stop_con(char *inbuf, void *UNUSED);
 void print_cons(char *UNUSED, void *_UNUSED);
-void show_coms(char *UNUSED, void *_UNUSED);
+void help(char *UNUSED, void *_UNUSED);
 // Helper Functions
 void delete_con(connection * con);
 // Data Callbacks
-static void echo_read_cb(struct bufferevent *bev, void *ctx);
-static void echo_event_cb(struct bufferevent *bev, short events, void *ctx);
+static void data_read_cb(struct bufferevent *bev, void *ctx);
+static void data_event_cb(struct bufferevent *bev, short events, void *ctx);
 // Controller Callbacks
-static void controller_cb_read(struct bufferevent *bev, void *ctx);
-static void controller_cb_event(struct bufferevent *bev, short events,void *ctx);
+static void controller_read_cb(struct bufferevent *bev, void *ctx);
+static void controller_event_cb(struct bufferevent *bev, short events,void *ctx);
 // Listener Callbacks
-static void listener_cb_accept(struct evconnlistener *listener,
+static void listener_accept_cb(struct evconnlistener *listener,
 			       evutil_socket_t fd, struct sockaddr *address,
 			       int socklen, void *ctx);
-static void listener_cb_error(struct evconnlistener *listener, void *ctx);
+static void listener_error_cb(struct evconnlistener *listener, void *ctx);
 // Signal Callbacks
-void signalcb(evutil_socket_t sig, short events, void *user_data);
+void signal_cb(evutil_socket_t sig, short events, void *user_data);
 
 /*
  * Globals
@@ -79,6 +79,6 @@ command controller_coms[] = {
 	{"print_cons", &print_cons},
 	{"start", &start_con},
 	{"stop", &stop_con},
-	{"help", &show_coms},
+	{"help", &help},
 	{(char *)NULL, (com_ptr)NULL}
 };

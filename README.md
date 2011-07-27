@@ -11,7 +11,7 @@ then takes the data from them and does stuff with it.
 
 Yeah, that's vague, but that's the spec I have, too.
 
-/* Notes */
+## Notes ##
 - possible to avoid doing data copies
     - http://www.wangafu.net/~nickm/libevent-book/Ref7_evbuffer.html
     - Avoiding data copies with evbuffer-based IO
@@ -23,9 +23,9 @@ Yeah, that's vague, but that's the spec I have, too.
 			- sandbox.c
 			- hiperfifo.c
 
-/* Structure */
+## Structure ##
 1. Main
-    BOOM 1. Set up an event_base
+    <del> 1. Set up an event_base</del>
         BOOM - only use epoll & kqueue
         BOOM - create the config
         BOOM - create the base

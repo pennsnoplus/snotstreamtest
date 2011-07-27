@@ -19,6 +19,7 @@
 #include "lib/json/json.h"
 #include "lib/pouch/pouch.h"
 
+// Helper Functions
 void delete_con(connection * con) {
 	if (con->type)
 		free(con->type);
@@ -33,7 +34,8 @@ void delete_con(connection * con) {
 	}
 }
 
-void show_coms(char *UNUSED, void *_UNUSED){
+// Commands
+void help(char *UNUSED, void *_UNUSED){
 	int i;
 	puts("Commands:");
 	for(i = 0; controller_coms[i].key; i++){
@@ -109,7 +111,7 @@ void start_con(char *inbuf, void *UNUSED) {
 		connection *con = &monitoring_cons[cur_mon_con];
 		con->bev =
 		    bufferevent_socket_new(base, -1, BEV_OPT_CLOSE_ON_FREE);
-		bufferevent_setcb(con->bev, echo_read_cb, NULL, echo_event_cb,
+		bufferevent_setcb(con->bev, data_read_cb, NULL, data_event_cb,
 				  con);
 		bufferevent_enable(con->bev, EV_READ | EV_WRITE);
 
@@ -182,16 +184,9 @@ void start_con(char *inbuf, void *UNUSED) {
 	}
 }
 
-/* Signal callback */
-void signalcb(evutil_socket_t sig, short events, void *user_data) {
-	struct event_base *base = user_data;
-	printf("Caught an interrupt signal; exiting.\n");
-	event_base_loopbreak(base);
-}
-
-/* Data callback */
-static void echo_read_cb(struct bufferevent *bev, void *ctx) {
-	//TODO: rename echo_read_cb
+// Data Callbacks
+static void data_read_cb(struct bufferevent *bev, void *ctx) {
+	//TODO: rename data_read_cb
 	/* This callback is invoked when there is data to read on bev. */
 	struct evbuffer *input = bufferevent_get_input(bev);
 	//struct evbuffer *output = bufferevent_get_output(bev);
@@ -281,7 +276,7 @@ static void echo_read_cb(struct bufferevent *bev, void *ctx) {
 	pr_free(pr);
 }
 
-static void echo_event_cb(struct bufferevent *bev, short events, void *ctx) {
+static void data_event_cb(struct bufferevent *bev, short events, void *ctx) {
 	if (events & BEV_EVENT_ERROR)
 		perror("Error from bufferevent");
 	if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) {
@@ -289,8 +284,8 @@ static void echo_event_cb(struct bufferevent *bev, short events, void *ctx) {
 	}
 }
 
-/* Controller callbacks */
-static void controller_cb_read(struct bufferevent *bev, void *ctx) {
+// Controller Callbacks
+static void controller_read_cb(struct bufferevent *bev, void *ctx) {
 	struct evbuffer *input = bufferevent_get_input(bev);
 	char inbuf[100]; // arbitrary sizing
 	memset(&inbuf, 0, sizeof(inbuf));
@@ -316,7 +311,7 @@ static void controller_cb_read(struct bufferevent *bev, void *ctx) {
 	}
 }
 
-static void controller_cb_event(struct bufferevent *bev, short events,void *ctx) {
+static void controller_event_cb(struct bufferevent *bev, short events,void *ctx) {
 	if (events & BEV_EVENT_ERROR)
 		perror("Error from bufferevent (controller)");
 	if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) {
@@ -326,24 +321,16 @@ static void controller_cb_event(struct bufferevent *bev, short events,void *ctx)
 	}
 }
 
-/* Listener callbacks */
-static void listener_cb_error(struct evconnlistener *listener, void *ctx) {
-	struct event_base *base = evconnlistener_get_base(listener);
-	int err = EVUTIL_SOCKET_ERROR();
-	fprintf(stderr, "Got an error %d (%s) on the listener. "
-		"Shutting down.\n", err, evutil_socket_error_to_string(err));
-	event_base_loopexit(base, NULL);
-}
-
-static void listener_cb_accept(struct evconnlistener *listener,
+// Listener Callbacks
+static void listener_accept_cb(struct evconnlistener *listener,
 			       evutil_socket_t fd, struct sockaddr *address,
 			       int socklen, void *ctx) {
 	if (!have_controller) {
 		struct event_base *base = evconnlistener_get_base(listener);
 		struct bufferevent *bev =
 		    bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
-		bufferevent_setcb(bev, controller_cb_read, NULL,
-				  controller_cb_event, NULL);
+		bufferevent_setcb(bev, controller_read_cb, NULL,
+				  controller_event_cb, NULL);
 		bufferevent_enable(bev, EV_READ | EV_WRITE);
 		have_controller++;
 	} else {
@@ -351,6 +338,26 @@ static void listener_cb_accept(struct evconnlistener *listener,
 		fprintf(stderr, "Closed extra controller connection\n");
 	}
 }
+
+static void listener_error_cb(struct evconnlistener *listener, void *ctx) {
+	struct event_base *base = evconnlistener_get_base(listener);
+	int err = EVUTIL_SOCKET_ERROR();
+	fprintf(stderr, "Got an error %d (%s) on the listener. "
+		"Shutting down.\n", err, evutil_socket_error_to_string(err));
+	event_base_loopexit(base, NULL);
+}
+
+// Signal Callbacks
+void signal_cb(evutil_socket_t sig, short events, void *user_data) {
+	struct event_base *base = user_data;
+	printf("Caught an interrupt signal; exiting.\n");
+	event_base_loopbreak(base);
+}
+
+
+
+
+
 
 int main(int argc, char **argv) {
 	// Setup the port
@@ -398,7 +405,7 @@ int main(int argc, char **argv) {
 	sin.sin_family = AF_INET;	/* This is an INET address */
 	sin.sin_addr.s_addr = htonl(0);	/* Listen on 0.0.0.0 */
 	sin.sin_port = htons(port);	/* Listen on the given port. */
-	listener = evconnlistener_new_bind(base, listener_cb_accept, NULL,
+	listener = evconnlistener_new_bind(base, listener_accept_cb, NULL,
 					   LEV_OPT_CLOSE_ON_FREE |
 					   LEV_OPT_REUSEABLE, -1,
 					   (struct sockaddr *)&sin,
@@ -407,11 +414,11 @@ int main(int argc, char **argv) {
 		perror("Couldn't create listener");
 		return 1;
 	}
-	evconnlistener_set_error_cb(listener, listener_cb_error);
+	evconnlistener_set_error_cb(listener, listener_error_cb);
 
 	// Create a signal watcher
 	struct event *signal_event;	// listens for C-c
-	signal_event = evsignal_new(base, SIGINT, signalcb, (void *)base);
+	signal_event = evsignal_new(base, SIGINT, signal_cb, (void *)base);
 	if (!signal_event || event_add(signal_event, NULL) < 0) {
 		fprintf(stderr, "Could not create/add a signal event!\n");
 		return 1;
