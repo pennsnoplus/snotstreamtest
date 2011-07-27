@@ -14,6 +14,9 @@
 #include <event2/util.h>
 #include <event2/event.h>
 
+// Threading
+#include <pthread.h>
+
 // Custom
 #include "echo.h"
 #include "lib/json/json.h"
@@ -21,8 +24,7 @@
 
 // Helper Functions
 void delete_con(connection * con) {
-	if (con->type)
-		free(con->type);
+	printf("Closed %s %s:%d\n", get_con_typestr(con->type), con->host, con->port);
 	if (con->host)
 		free(con->host);
 	if (con->bev)
@@ -34,72 +36,97 @@ void delete_con(connection * con) {
 	}
 }
 
+int get_con_type(char *typestr){
+	// lowercase the type string
+	char lowercase[strlen(typestr) + 1];
+	strcpy(lowercase, typestr);
+	int i;
+	for (i = 0; i < strlen(lowercase); i++) {
+		lowercase[i] = tolower(lowercase[i]);
+	}
+	if (!strcmp(lowercase, "ev_builder"))
+		return EV_BUILDER;
+	if (!strcmp(lowercase, "xl3"))
+		return XL3;
+	if (!strcmp(lowercase, "mtc"))
+		return MTC;
+	if (!strcmp(lowercase, "caen"))
+		return CAEN;
+	if (!strcmp(lowercase, "orca"))
+		return ORCA;
+	return UNKNOWN;
+}
+
+char *get_con_typestr(con_type type){
+	switch (type){
+		case EV_BUILDER:
+			return "EV_BUILDER";
+		case XL3:
+			return "XL3";
+		case MTC:
+			return "MTC";
+		case CAEN:
+			return "CAEN";
+		case ORCA:
+			return "ORCA";
+		default:
+			return "UNKNOWN";
+	}
+}
+	
 // Commands
 void help(char *UNUSED, void *_UNUSED){
 	int i;
 	puts("Commands:");
 	for(i = 0; controller_coms[i].key; i++){
-		puts(controller_coms[i].key);
+		printf("\t%s\n", controller_coms[i].key);
 	}
 }
 
 void print_cons(char *UNUSED, void *_UNUSED) {
-	if (cur_mon_con != 0) {
-		printf("cur_mon_con= %d\n", cur_mon_con);
-		int i;
-		connection *con;
-		for (i = 0; i < cur_mon_con; i++) {
-			con = &monitoring_cons[i];
-			if (con->valid) {
-				printf("%s %s:%d\n", con->type, con->host,
-				       con->port);
-			}
+	int i;
+	connection *con;
+	puts("Connections:\n");
+	for (i = 0; i < cur_mon_con; i++) {
+		con = &monitoring_cons[i];
+		if (con->valid) {
+			printf("\t%s %s:%d\n", get_con_typestr(con->type), con->host,
+					con->port);
 		}
-	} else {
-		printf("No monitoring connections.\n");
 	}
 }
 
 void stop_con(char *inbuf, void *UNUSED) {
-	if (!cur_mon_con)
-		printf("No connections to stop.\n");
-	else {
-		char *type;
-		char *host;
-		char *portstr;
-		int i;
-		portstr = strtok(inbuf, " "); // get rid of command name
-		for (i = 0; i < 3 && portstr != NULL; i++) {
-			portstr = strtok(NULL, " ");
-			if (portstr == NULL)
-				break;
-			if (i == 0)
-				type = portstr;
-			else if (i == 1)
-				host = portstr;
-		}
-		int error;
-		if (i != 3) {
-			printf("Incorrect number of arguments\n");
-			printf("stop <type> <host> <port>\n");
-		} else {
-			int port = atoi(portstr);
-			int j;
-			connection *con;
-			for (j = 0; j < cur_mon_con; j++) {
-				con = &monitoring_cons[j];
-				if (!strcmp(con->type, type)) {
-					if (!strcmp(con->host, host)) {
-						if (con->port == port) {
-							printf
-							    ("Stopped monitoring %s %s:%d\n",
-							     con->type,
-							     con->host,
-							     con->port);
-							delete_con(con);
-							break;
-						}
-					}
+	char *type;
+	char *host;
+	char *portstr;
+	int i;
+	portstr = strtok(inbuf, " "); // get rid of command name
+	for (i = 0; i < 3 && portstr != NULL; i++) {
+		portstr = strtok(NULL, " ");
+		if (portstr == NULL)
+			break;
+		if (i == 0)
+			type = portstr;
+		else if (i == 1)
+			host = portstr;
+	}
+	if (i != 3) {
+		printf("Incorrect number of arguments\n");
+		printf("stop <type> <host> <port>\n");
+		return;
+	}
+	int port = atoi(portstr);
+	connection *con;
+	int j;
+	for(j = 0; j < cur_mon_con; j++){
+		con = &monitoring_cons[j];
+		if (con->port == port){
+			if(con->type == get_con_type(type)){
+				if (!strcmp(con->host, host)){
+					delete_con(con);
+					printf("Stopped monitoring %s %s:%d\n", get_con_typestr(con->type), con->host, con->port);
+					return;
 				}
 			}
 		}
@@ -107,81 +134,123 @@ void stop_con(char *inbuf, void *UNUSED) {
 }
 
 void start_con(char *inbuf, void *UNUSED) {
-	if (cur_mon_con < MAX_MON_CONS) {	// we can still make new cons
-		connection *con = &monitoring_cons[cur_mon_con];
-		con->bev =
-		    bufferevent_socket_new(base, -1, BEV_OPT_CLOSE_ON_FREE);
-		bufferevent_setcb(con->bev, data_read_cb, NULL, data_event_cb,
-				  con);
-		bufferevent_enable(con->bev, EV_READ | EV_WRITE);
-
-		char *type;
-		char *host;
-		char *portstr;
-		int i;
-		portstr = strtok(inbuf, " "); // get rid of command name
-		for (i = 0; i < 3 && portstr != NULL; i++) {
-			portstr = strtok(NULL, " ");
-			if (portstr == NULL)
-				break;
-			if (i == 0)
-				type = portstr;
-			else if (i == 1)
-				host = portstr;
-		}
-		int error;
-		if (i != 3) {
-			printf("Incorrect number of arguments\n");
-			printf("create <type> <host> <port>\n");
-			bufferevent_free(con->bev);
-		} else {
-			char lowercase[strlen(type) + 1];
-			strcpy(lowercase, type);
-			int i;
-			for (i = 0; i < strlen(type); i++) {
-				lowercase[i] = tolower(lowercase[i]);
-			}
-			con->type = (char *)malloc(strlen(lowercase) + 1);
-			strcpy(con->type, lowercase);
-			if (!strcmp(con->type, "ev_builder")) {
-				con->con_type = EV_BUILDER;
-			} else if (!strcmp(con->type, "xl3")) {
-				con->con_type = XL3;
-			} else if (!strcmp(con->type, "mtc")) {
-				con->con_type = MTC;
-			} else if (!strcmp(con->type, "caen")) {
-				con->con_type = CAEN;
-			} else if (!strcmp(con->type, "orca")) {
-				con->con_type = ORCA;
-			} else {
-				fprintf(stderr,
-					"Not a valid monitoring type\n");
-				//TODO: fix the memory leak here
-				return;
-			}
-			con->pktsize = pkt_size_of[con->con_type];
-
-			/* make sure there is enough data to fill a packet */
-			bufferevent_setwatermark(con->bev, EV_READ,
-						 con->pktsize, 0);
-			con->host = (char *)malloc(strlen(host) + 1);
-			strcpy(con->host, host);
-			con->port = atoi(portstr);
-			con->valid++;
-			if (!bufferevent_socket_connect_hostname
-			    (con->bev, dnsbase, AF_UNSPEC, con->host,
-			     con->port)) {
-				printf("Created socket\n");
-				cur_mon_con = 0;
-				while (monitoring_cons[cur_mon_con].valid) {
-					cur_mon_con++;
-				}
-			} else {
-				printf("Unable to create socket\n");
-				delete_con(con);
-			}
-		}
+	char *type;
+	char *host;
+	char *portstr;
+	int i;
+	portstr = strtok(inbuf, " "); // get rid of command name
+	for (i = 0; i < 3 && portstr != NULL; i++) {
+		portstr = strtok(NULL, " ");
+		if (portstr == NULL)
+			break;
+		if (i == 0)
+			type = portstr;
+		else if (i == 1)
+			host = portstr;
 	}
+	if (i != 3) { // make sure there are enough arguments
+		printf("Incorrect number of arguments\n");
+		printf("create <type> <host> <port>\n");
+		return;
+	}
+	if (cur_mon_con >= MAX_MON_CONS){ // make sure there are enough free cons
+		fprintf(stderr, "no more free connections\n");
+		return;
+	}
+	// create the connection
+	connection *con = &(monitoring_cons[cur_mon_con]);
+	con->bev = bufferevent_socket_new(base, -1, BEV_OPT_CLOSE_ON_FREE);
+	bufferevent_setcb(con->bev, data_read_cb, NULL, data_event_cb, con);
+	bufferevent_enable(con->bev, EV_READ | EV_WRITE);
+	
+	// fill out the connection information
+	con->type = get_con_type(type);
+	con->pktsize = pkt_size_of[con->type];
+	con->valid++;
+
+	// set the appropriate read callback watermarks
+	bufferevent_setwatermark(con->bev, EV_READ, con->pktsize, 0);
+	con->host = (char *)malloc(strlen(host)+1);
+	strcpy(con->host, host);
+	con->port = atoi(portstr);
+	
+	// make the connection
+	if (!bufferevent_socket_connect_hostname
+			(con->bev, dnsbase, AF_UNSPEC, con->host,
+			 con->port)) {
+		printf("Created monitoring connection: %s %s:%d\n", get_con_typestr(con->type), con->host, con->port);
+	} else {
+		printf("COULD NOT create monitoring connection: %s %s:%d\n", get_con_typestr(con->type), con->host, con->port);
+		delete_con(con);
+	}
+	cur_mon_con = 0;
+	while (monitoring_cons[cur_mon_con].valid) {
+		cur_mon_con++;
+	}
+}
+
+// Data Handlers
+void *handle_xl3(void *data_pkt){
+	XL3_Packet *xpkt = (XL3_Packet *)data_pkt;
+	XL3_CommandHeader cmhdr = (XL3_CommandHeader)xpkt->cmdHeader;
+	PMTBundle *bndl_array = (PMTBundle *)(xpkt->payload);
+	int i;
+	JsonNode *data;
+	for(i = 0; i < sizeof(xpkt->payload)/sizeof(PMTBundle); i++){
+		// fill the bundle
+		uint32_t bndl[3];
+		memcpy(bndl, &bndl_array[i],sizeof(bndl));
+		// unpack the bundle
+		uint32_t chan,cell,gt24,gt16,gt8,qlx,qhs,qhl,tac,cmos16,cgt16,cgt24,missed,lgi,nc_cc,crate,board;
+		chan = (uint32_t) UNPK_CHANNEL_ID(bndl);
+		cell = (uint32_t) UNPK_CELL_ID(bndl);
+		gt24 = (uint32_t) UNPK_FEC_GT24_ID(bndl);
+		gt16 = (uint32_t) UNPK_FEC_GT16_ID(bndl);
+		gt8 = (uint32_t) UNPK_FEC_GT8_ID(bndl);
+		qlx = (uint32_t) UNPK_QLX(bndl);
+		qhs = (uint32_t) UNPK_QHS(bndl);
+		qhl = (uint32_t) UNPK_QHL(bndl);
+		tac = (uint32_t) UNPK_TAC(bndl);
+		cmos16 = (uint32_t) UNPK_CMOS_ES_16(bndl);
+		cgt16 = (uint32_t) UNPK_CGT_ES_16(bndl);
+		cgt24 = (uint32_t) UNPK_CGT_ES_24(bndl);
+		missed = (uint32_t) UNPK_MISSED_COUNT(bndl);
+		lgi = (uint32_t) UNPK_LGI_SELECT(bndl);
+		nc_cc = (uint32_t) UNPK_NC_CC(bndl);
+		crate = (uint32_t) UNPK_CRATE_ID(bndl);
+		board = (uint32_t) UNPK_BOARD_ID(bndl);
+		// create the JSON object
+		data = json_mkobject();
+		json_append_member(data, "chan", json_mknumber(chan));
+		json_append_member(data, "cell", json_mknumber(cell));
+		json_append_member(data, "gt24", json_mknumber(gt24));
+		json_append_member(data, "gt16", json_mknumber(gt16));
+		json_append_member(data, "gt8", json_mknumber(gt8));
+		json_append_member(data, "qlx", json_mknumber(qlx));
+		json_append_member(data, "qhs", json_mknumber(qhs));
+		json_append_member(data, "qhl", json_mknumber(qhl));
+		json_append_member(data, "tac", json_mknumber(tac));
+		json_append_member(data, "cmos16", json_mknumber(cmos16));
+		json_append_member(data, "cgt16", json_mknumber(cgt16));
+		json_append_member(data, "cgt24", json_mknumber(cgt24));
+		json_append_member(data, "missed", json_mknumber(missed));
+		json_append_member(data, "lgi", json_mknumber(lgi));
+		json_append_member(data, "nc_cc", json_mknumber(nc_cc));
+		json_append_member(data, "crate", json_mknumber(crate));
+		json_append_member(data, "board", json_mknumber(board));
+		// send the data
+		char *datastr = json_encode(data);
+		pouch_request *pr = pr_init();
+		pr = doc_create(pr, "http://peterldowns:2rlz54NeO3@peterldowns.cloudant.com", "testing", datastr);
+		pr_do(pr);
+		// clean up
+		pr_free(pr);
+		json_delete(data);
+		free(datastr);
+	}
+	puts("uploaded XL3 bundle");
+	free(data_pkt);
+	pthread_exit(NULL);
 }
 
 // Data Callbacks
@@ -192,87 +261,51 @@ static void data_read_cb(struct bufferevent *bev, void *ctx) {
 
 	/* Copy all the data from the input buffer to the output buffer. */
 	//evbuffer_add_buffer(output, input);
-	connection *con = (connection *) ctx;
+	connection *con = (connection *)ctx;
 	char data_pkt[con->pktsize];
 	
 	//create a pouch_request* object
-	pouch_request *pr = pr_init();
 	int n = 1;
 	while (evbuffer_get_length(input) >= con->pktsize && n > 0) {
-		//TODO: spawn a new thread here. (pthread vs. fork?)
-		//TODO: make a separate function for each type of data upload, so that threading is easier/more logical
+		printf("%d\n", (int)con->pktsize);
+		printf("EV_BUILDER: %d\n", (int)pkt_size_of[EV_BUILDER]);
+		printf("XL3: %d\n", (int)pkt_size_of[XL3]);
+		printf("MTC: %d\n", (int)pkt_size_of[MTC]);
+		printf("CAEN: %d\n", (int)pkt_size_of[CAEN]);
 		memset(&data_pkt, 0, con->pktsize);
+
 		n = evbuffer_remove(input, data_pkt, con->pktsize);
-		printf("Received data packet (%d bytes)\n", con->pktsize);
-		if (con->con_type == XL3){
-			printf("XL3 packet!\n");
-			XL3_Packet *xpkt = (XL3_Packet *)data_pkt;
-			XL3_CommandHeader cmhdr = (XL3_CommandHeader)xpkt->cmdHeader;
-			PMTBundle *bndl_array = (PMTBundle *)(xpkt->payload);
-			int i;
-			JsonNode *data;
-			for(i = 0; i < sizeof(xpkt->payload)/sizeof(PMTBundle); i++){
-				// fill the bundle
-				uint32_t bndl[3];
-				memcpy(bndl, &bndl_array[i],sizeof(bndl));
-				// unpack the bundle
-				uint32_t chan,cell,gt24,gt16,gt8,qlx,qhs,qhl,tac,cmos16,cgt16,cgt24,missed,lgi,nc_cc,crate,board;
-				chan = (uint32_t) UNPK_CHANNEL_ID(bndl);
-                cell = (uint32_t) UNPK_CELL_ID(bndl);
-                gt24 = (uint32_t) UNPK_FEC_GT24_ID(bndl);
-				gt16 = (uint32_t) UNPK_FEC_GT16_ID(bndl);
-				gt8 = (uint32_t) UNPK_FEC_GT8_ID(bndl);
-                qlx = (uint32_t) UNPK_QLX(bndl);
-                qhs = (uint32_t) UNPK_QHS(bndl);
-                qhl = (uint32_t) UNPK_QHL(bndl);
-                tac = (uint32_t) UNPK_TAC(bndl);
-                cmos16 = (uint32_t) UNPK_CMOS_ES_16(bndl);
-                cgt16 = (uint32_t) UNPK_CGT_ES_16(bndl);
-                cgt24 = (uint32_t) UNPK_CGT_ES_24(bndl);
-                missed = (uint32_t) UNPK_MISSED_COUNT(bndl);
-                lgi = (uint32_t) UNPK_LGI_SELECT(bndl);
-                nc_cc = (uint32_t) UNPK_NC_CC(bndl);
-                crate = (uint32_t) UNPK_CRATE_ID(bndl);
-                board = (uint32_t) UNPK_BOARD_ID(bndl);
-				// create the JSON object
-				data = json_mkobject();
-				json_append_member(data, "chan", json_mknumber(chan));
-				json_append_member(data, "cell", json_mknumber(cell));
-				json_append_member(data, "gt24", json_mknumber(gt24));
-				json_append_member(data, "gt16", json_mknumber(gt16));
-				json_append_member(data, "gt8", json_mknumber(gt8));
-				json_append_member(data, "qlx", json_mknumber(qlx));
-				json_append_member(data, "qhs", json_mknumber(qhs));
-				json_append_member(data, "qhl", json_mknumber(qhl));
-				json_append_member(data, "tac", json_mknumber(tac));
-				json_append_member(data, "cmos16", json_mknumber(cmos16));
-				json_append_member(data, "cgt16", json_mknumber(cgt16));
-				json_append_member(data, "cgt24", json_mknumber(cgt24));
-				json_append_member(data, "missed", json_mknumber(missed));
-				json_append_member(data, "lgi", json_mknumber(lgi));
-				json_append_member(data, "nc_cc", json_mknumber(nc_cc));
-				json_append_member(data, "crate", json_mknumber(crate));
-				json_append_member(data, "board", json_mknumber(board));
-				// send the data
-				char *datastr = json_encode(data);
-				pr = doc_create(pr, "http://peterldowns:2rlz54NeO3@peterldowns.cloudant.com", "testing", datastr);
-				pr_do(pr);
-				// clean up
-				json_delete(data);
-				free(datastr);
-			}
-			printf("finished XL3\n");
+		printf("Received data packet (%d bytes)\n", (int)(con->pktsize));
+
+		// build a temporary packet for each thread
+		char *tmp_pkt = (char *)malloc(con->pktsize);
+		if (!tmp_pkt){
+			fprintf(stderr, "could not malloc()ate enough memory for a temporary packet\n");
+			return;
+		}
+		memcpy(tmp_pkt, &data_pkt, con->pktsize);
+
+		pthread_t thread;
+		int rc;
+		switch (con->type){
+			case XL3:
+				rc = pthread_create(&thread, NULL, handle_xl3, (void *)tmp_pkt);
+				break;
+			default:
+				printf("not sure how to handle this data.\n");
+				break;
+		}
+		if (rc) {
+			fprintf(stderr, "ERROR: return code from pthread_create() is %d\n", rc);
 		}
 	}
-	// get rid of the pouch object
-	pr_free(pr);
 }
 
 static void data_event_cb(struct bufferevent *bev, short events, void *ctx) {
 	if (events & BEV_EVENT_ERROR)
 		perror("Error from bufferevent");
 	if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) {
-		delete_con((connection *) ctx);
+		delete_con((connection *)ctx);
 	}
 }
 
@@ -412,9 +445,12 @@ int main(int argc, char **argv) {
 	}
 	// Run the main loop
 	event_base_dispatch(base);
-
+	
+	// TODO: delete all cons that are valid
 	// Clean up
+	event_del(signal_event);
+	free(signal_event);
 	evdns_base_free(dnsbase, 0);
 	event_base_free(base);
-	return 0;
+	pthread_exit(NULL);
 }
