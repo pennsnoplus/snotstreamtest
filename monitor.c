@@ -18,7 +18,7 @@
 #include <pthread.h>
 
 // Custom
-#include "echo.h"
+#include "monitor.h"
 #include "lib/json/json.h"
 #include "lib/pouch/pouch.h"
 
@@ -222,7 +222,8 @@ void *handle_xl3(void *data_pkt){
 		// send the data
 		char *datastr = json_encode(data);
 		pouch_request *pr = pr_init();
-		pr = doc_create(pr, "http://peterldowns:2rlz54NeO3@peterldowns.cloudant.com", "testing", datastr);
+		//pr = doc_create(pr, "http://peterldowns:2rlz54NeO3@peterldowns.cloudant.com", "testing", datastr);
+		pr = doc_create(pr, "http://notdirac.hep.upenn.edu:5985", "pmt-test", datastr);
 		pr_do(pr);
 		// clean up
 		pr_free(pr);

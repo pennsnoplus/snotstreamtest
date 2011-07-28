@@ -1,6 +1,6 @@
-echo: clean fakedata
-	gcc -o echo echo.c lib/pouch/pouch.c lib/json/json.c -lcurl -levent -lpthread -L/usr/local/lib -g
+monitor: clean fakedata
+	gcc -o monitor monitor.c lib/pouch/pouch.c lib/json/json.c -lcurl -levent -lpthread -L/usr/local/lib -g
 clean:
-	-$(RM) echo fakedata
+	-$(RM) monitor fakedata
 fakedata:
 	gcc -o fakedata fakedata.c -levent -L/usr/local/lib -g
