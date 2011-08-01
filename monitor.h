@@ -1,7 +1,10 @@
 #include "pkt_types.h"
 #include "pkt_utils.h"
+#include "ringbuf.h"
 
 #define MAX_MON_CONS 10
+#define SERVER "http://snoplus:snoplustest@snoplus.cloudant.com"
+#define DATABASE "pmt-test"
 
 /*
  * Structures
@@ -81,6 +84,8 @@ void signal_cb(evutil_socket_t sig, short events, void *user_data);
 struct event_base *base;
 struct evdns_base *dnsbase;
 struct evconnlistener *listener;
+//struct evbuffer *xl3_pool;
+Ringbuf *xl3_buf;
 int have_controller = 0;
 int cur_mon_con = 0;
 connection monitoring_cons[MAX_MON_CONS];

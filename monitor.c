@@ -21,6 +21,7 @@
 #include "monitor.h"
 #include "lib/json/json.h"
 #include "lib/pouch/pouch.h"
+//#include "ringbuf.h"
 
 // Helper Functions
 void delete_con(connection * con) {
@@ -172,6 +173,22 @@ void start_con(char *inbuf, void *UNUSED) {
 
 // Data Handlers
 void *handle_xl3(void *data_pkt){
+	if(ringbuf_isfull(xl3_buf)){
+		puts("xl3 ring buffer is full");
+		pouch_request *pr;
+		char *datastr;
+		while(!ringbuf_isempty(xl3_buf)){
+			pr = pr_init();
+			ringbuf_pop(xl3_buf, (void **)&datastr);
+			pr = doc_create(pr, SERVER, DATABASE, datastr);
+			pr_do(pr);
+			free(datastr);
+			puts("... flushed xl3 JSON");
+		}
+		pr_free(pr);
+		puts("xl3 ring buffer is empty");
+	}
+
 	XL3_Packet *xpkt = (XL3_Packet *)data_pkt;
 	XL3_CommandHeader cmhdr = (XL3_CommandHeader)xpkt->cmdHeader;
 	PMTBundle *bndl_array = (PMTBundle *)(xpkt->payload);
@@ -219,18 +236,25 @@ void *handle_xl3(void *data_pkt){
 		json_append_member(data, "nc_cc", json_mknumber(nc_cc));
 		json_append_member(data, "crate", json_mknumber(crate));
 		json_append_member(data, "board", json_mknumber(board));
-		// send the data
+		
+		// add data to buffer
 		char *datastr = json_encode(data);
+		ringbuf_push(xl3_buf, (void *)datastr);
+		json_delete(data);
+		free(datastr);
+		
+		/*
+		// send the data
 		pouch_request *pr = pr_init();
-		//pr = doc_create(pr, "http://peterldowns:2rlz54NeO3@peterldowns.cloudant.com", "testing", datastr);
-		pr = doc_create(pr, "http://notdirac.hep.upenn.edu:5985", "pmt-test", datastr);
+		pr = doc_create(pr, SERVER, DATABASE, datastr);
 		pr_do(pr);
 		// clean up
 		pr_free(pr);
 		json_delete(data);
 		free(datastr);
+		*/
 	}
-	puts("uploaded XL3 bundle");
+	//puts("uploaded XL3 bundle");
 	free(data_pkt);
 	pthread_exit(NULL);
 }
@@ -371,6 +395,10 @@ int main(int argc, char **argv) {
 		puts("Invalid port");
 		return 1;
 	}
+	// Initialize the XL3 out buffer
+	//xl3_buf = ringbuf_init(&xl3_buf, 100000);	//100,000
+	xl3_buf = ringbuf_init(&xl3_buf, 10);
+
 	// Configure our event_base to be fast
 	struct event_config *cfg;
 	cfg = event_config_new();
