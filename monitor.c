@@ -73,7 +73,24 @@ char *get_con_typestr(con_type type){
 			return "UNKNOWN";
 	}
 }
-	
+
+void *upload_buffer(void *ptr){
+	Ringbuf *rbuf = (Ringbuf *)ptr;
+	puts("ring buffer is full");
+	pouch_request *pr;
+	char *datastr;
+	while(!ringbuf_isempty(rbuf)){
+		pr = pr_init();
+		ringbuf_pop(rbuf, (void **)&datastr);
+		pr = doc_create(pr, SERVER, DATABASE, datastr);
+		pr_do(pr);
+		free(datastr);
+		puts("... flushed JSON");
+	}
+	puts("ring buffer is empty");
+	pr_free(pr);
+	pthread_exit(NULL);
+}
 // Commands
 void help(char *UNUSED, void *_UNUSED){
 	int i;
@@ -172,23 +189,24 @@ void start_con(char *inbuf, void *UNUSED) {
 }
 
 // Data Handlers
-void *handle_xl3(void *data_pkt){
+void handle_xl3(void *data_pkt){
 	if(ringbuf_isfull(xl3_buf)){
-		puts("xl3 ring buffer is full");
-		pouch_request *pr;
-		char *datastr;
-		while(!ringbuf_isempty(xl3_buf)){
-			pr = pr_init();
-			ringbuf_pop(xl3_buf, (void **)&datastr);
-			pr = doc_create(pr, SERVER, DATABASE, datastr);
-			pr_do(pr);
-			free(datastr);
-			puts("... flushed xl3 JSON");
+		int rc = 0;
+		pthread_t thread;
+		rc = pthread_create(&thread, NULL, upload_buffer, &xl3_buf); // TODO: Mutex lock this, or come up with a better strategy for uploads
+		/*
+		 * Maybe create a buffer event of stuff to upload? the only problem is that it's not all the same width... if the data
+		 * were fixed width then you could just create a bufferevent and set the watermark to num_things * sizeof(thing). Or, maybe use a separator?
+		 * Could be really weird and awful, but I *really* don't like the use of global variables here.
+		 */
+		if (rc) {
+			fprintf(stderr, "ERROR: return code from pthread_create() is %d\n", rc);
 		}
-		pr_free(pr);
-		puts("xl3 ring buffer is empty");
 	}
-
+	else{
+	// TODO: This is very bad. While uploading, data is being added. O_o that's not good at all...
+	// 		 againn, some sort of fix is needed. 
+		
 	XL3_Packet *xpkt = (XL3_Packet *)data_pkt;
 	XL3_CommandHeader cmhdr = (XL3_CommandHeader)xpkt->cmdHeader;
 	PMTBundle *bndl_array = (PMTBundle *)(xpkt->payload);
@@ -256,7 +274,8 @@ void *handle_xl3(void *data_pkt){
 	}
 	//puts("uploaded XL3 bundle");
 	free(data_pkt);
-	pthread_exit(NULL);
+	//pthread_exit(NULL);
+	}
 }
 
 // Data Callbacks
@@ -286,20 +305,15 @@ static void data_read_cb(struct bufferevent *bev, void *ctx) {
 		}
 		memcpy(tmp_pkt, &data_pkt, con->pktsize);
 
-		pthread_t thread;
-		int rc=0;
 		switch (con->type){
 			case XL3:
-				rc = pthread_create(&thread, NULL, handle_xl3, (void *)tmp_pkt);
+				handle_xl3(tmp_pkt);
+				//rc = pthread_create(&thread, NULL, handle_xl3, (void *)tmp_pkt);
 				break;
 			default:
 				printf("not sure how to handle this data.\n");
 				break;
 		}
-		if (rc) {
-			fprintf(stderr, "ERROR: return code from pthread_create() is %d\n", rc);
-		}
-		
 	}
 }
 
