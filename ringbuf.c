@@ -34,6 +34,24 @@ void ringbuf_clear(Ringbuf *rb){
 	rb->read = 0;
 	rb->fill = 0;
 }
+Ringbuf *ringbuf_copy(Ringbuf *rb){
+	Ringbuf *out;
+	out = ringbuf_init(out, rb->num_keys);
+	for(i = 0; i < rb->num_keys; i++){
+		if(rb->keys[i] != NULL){
+			out->keys[i] = rb->keys[i]; // now out is in charge of the memory
+			rb->keys[i] = NULL;
+		}
+	}
+	out->write = rb->write;
+	out->read = rb->read;
+	out->fill = rb->fill;
+	rb->write = 0;
+	rb->read = 0;
+	rb->fill = 0;
+	return out;
+}
+
 // debugging
 void ringbuf_status(Ringbuf *rb){
 	printf("Ringbuf at %p:\n", rb);

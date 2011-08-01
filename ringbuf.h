@@ -14,6 +14,8 @@ typedef struct {
 Ringbuf *ringbuf_init(Ringbuf **rb, int num_keys);
 // clear
 void ringbuf_clear(Ringbuf *rb);
+// "copy" (move)
+Ringbuf *ringbuf_copy(Ringbuf *rb);
 // debugging
 void ringbuf_status(Ringbuf *rb);
 // state
