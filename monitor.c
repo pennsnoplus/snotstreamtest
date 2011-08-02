@@ -190,9 +190,10 @@ void start_con(char *inbuf, void *UNUSED) {
 	}
 }
 
+
 // Data Handlers
 void handle_xl3(void *data_pkt){
-	return;
+	//return;
 	XL3_Packet *xpkt = (XL3_Packet *)data_pkt;
 	XL3_CommandHeader cmhdr = (XL3_CommandHeader)xpkt->cmdHeader;
 	PMTBundle *bndl_array = (PMTBundle *)(xpkt->payload);
@@ -263,13 +264,16 @@ void handle_xl3(void *data_pkt){
 }
 
 // Data Callbacks
-int __a=0;
+//int __a=0;
 static void data_read_cb(struct bufferevent *bev, void *ctx) {
+	//TODO: use peek() to not copy data, or something fast!!!
+	/*
 	if (!(__a%100))
 		printf("%d\n", __a++);
 	else
 		__a++;
 	return;
+	*/
 	/* This callback is invoked when there is data to read on bev. */
 	struct evbuffer *input = bufferevent_get_input(bev);
 	//struct evbuffer *output = bufferevent_get_output(bev);
@@ -312,6 +316,22 @@ static void data_event_cb(struct bufferevent *bev, short events, void *ctx) {
 		connection *con = (connection *)ctx;
 		fprintf(stderr, "Received EOF or error: closing %s connection to %s:%d\n", get_con_typestr(con->type),con->host,con->port);
 		delete_con((connection *)ctx);
+	}
+}
+
+static void buffer_timeout_cb(evutil_socket_t fd, short events, void *ctx){
+	//puts("BUFFER_TIMEOUT_CB\n");
+	Ringbuf *rbuf = (Ringbuf *)ctx;
+	//ringbuf_status(rbuf, "buffer_timeout_cb: ");
+	if(!ringbuf_isempty(rbuf)){
+		//puts("buffer_timeout_cb: Data to upload");
+		int rc = 0;
+		pthread_t thread;
+		Ringbuf *tmpbuf = ringbuf_copy(rbuf);
+		rc = pthread_create(&thread, NULL, upload_buffer, tmpbuf);
+		if (rc) {
+			fprintf(stderr, "ERROR: return code from pthread_create() is %d\n", rc);
+		}
 	}
 }
 
@@ -386,6 +406,16 @@ void signal_cb(evutil_socket_t sig, short events, void *user_data) {
 	printf("Caught an interrupt signal; exiting.\n");
 	event_base_loopbreak(base);
 }
+struct event *recurring_timer(struct event_base *base, struct timeval *interval, void (*user_cb)(evutil_socket_t, short, void *), void *user_data){
+	struct event *ev;
+	if(!(ev=event_new(base, -1, EV_PERSIST, user_cb, user_data)))
+		return NULL;
+	if(!(event_add(ev, interval))){
+		event_free(ev);
+		return NULL;
+	}
+	return ev;
+}
 
 int main(int argc, char **argv) {
 	// Setup the port
@@ -456,6 +486,29 @@ int main(int argc, char **argv) {
 		fprintf(stderr, "Could not create/add a signal event!\n");
 		return 1;
 	}
+
+	// Create the XL3 data watcher
+//struct event *recurring_timer(struct event_base *base, struct timeval *interval, void (*user_cb)(evutil_socket_t, short, void *), void *user_data){
+	
+	struct timeval xl3_delay; // set the delay to .5 seconds
+	xl3_delay.tv_sec=0;
+	xl3_delay.tv_usec=500000;
+
+	xl3_watcher = event_new(base, -1, EV_TIMEOUT|EV_PERSIST, buffer_timeout_cb, xl3_buf);
+	if(!xl3_watcher){
+		fprintf(stderr, "woops\n");
+		return 1;
+	}
+	event_add(xl3_watcher, &xl3_delay);
+
+/*
+	xl3_watcher = recurring_timer(base, &xl3_delay, &buffer_timeout_cb, xl3_buf);
+	if(!xl3_watcher){
+		fprintf(stderr, "Could not create xl3 watcher timeout\n");
+		return 1;
+	}
+	*/
+
 	// Run the main loop
 	event_base_dispatch(base);
 	

@@ -85,7 +85,7 @@ void signal_cb(evutil_socket_t sig, short events, void *user_data);
 struct event_base *base;
 struct evdns_base *dnsbase;
 struct evconnlistener *listener;
-//struct evbuffer *xl3_pool;
+struct event *xl3_watcher;
 Ringbuf *xl3_buf;
 int have_controller = 0;
 int cur_mon_con = 0;
