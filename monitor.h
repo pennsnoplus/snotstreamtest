@@ -1,10 +1,10 @@
 #include "pkt_types.h"
 #include "pkt_utils.h"
-#include "ringbuf.h"
+#include "lib/ringbuf/ringbuf.h"
 
 #define MAX_MON_CONS 10
-#define SERVER "http://snoplus:snoplustest@snoplus.cloudant.com"
-#define DATABASE "pmt-test"
+#define SERVER "localhost:5984"//"snoplus:snoplustest@snoplus.cloudant.com"
+#define DATABASE "pmt_test"
 
 /*
  * Structures

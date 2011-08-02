@@ -34,30 +34,54 @@ void ringbuf_clear(Ringbuf *rb){
 	rb->read = 0;
 	rb->fill = 0;
 }
+Ringbuf *ringbuf_copy(Ringbuf *rb){
+	printf("Status of original (%p)\n", rb);
+	ringbuf_status(rb, "orig");
+	Ringbuf *out;
+	out = ringbuf_init(&out, rb->num_keys);
+	int i;
+	for(i = 0; i < rb->num_keys; i++){
+		out->keys[i] = rb->keys[i]; // now out is in charge of the memory
+		rb->keys[i] = NULL;
+	}
+	out->write = rb->write;
+	out->read = rb->read;
+	out->fill = rb->fill;
+	rb->write = 0;
+	rb->read = 0;
+	rb->fill = 0;
+	printf("Status of out (%p)\n", out);
+	ringbuf_status(out, "out: ");
+	return out;
+}
+
 // debugging
-void ringbuf_status(Ringbuf *rb){
-	printf("Ringbuf at %p:\n", rb);
-	printf("  write: %lu\n", rb->write);
-	printf("   read: %lu\n", rb->read);
-	printf("   fill: %lu\n", rb->fill);
-	printf("   full: %d\n", ringbuf_isfull(rb));
-	printf("  empty: %d\n", ringbuf_isempty(rb));
+void ringbuf_status(Ringbuf *rb, char *pref){
+	printf("%sRingbuf at %p:\n", pref, rb);
+	printf("%s  write: %lu\n", pref, rb->write);
+	printf("%s   read: %lu\n", pref, rb->read);
+	printf("%s   fill: %lu\n", pref, rb->fill);
+	printf("%s   full: %d\n", pref, ringbuf_isfull(rb));
+	printf("%s  empty: %d\n", pref, ringbuf_isempty(rb));
 }
 	
 // state
 int ringbuf_isfull(Ringbuf *rb){
-	return ( ((rb->write) == (rb->read)) && (rb->fill) );
+	return ( ((rb->write) == (rb->read)) && (rb->fill != 0) );
 }
 int ringbuf_isempty(Ringbuf *rb){
 	return ( ((rb->write) == (rb->read)) && (rb->fill == 0) );
 }
 // add / remove
-int ringbuf_push(Ringbuf *rb, void *key){
+//int ringbuf_push(Ringbuf *rb, void *key, size_t size){
+int ringbuf_push(Ringbuf *rb, void *key, size_t size){
 	int full = ringbuf_isfull(rb);
 	if (!full){
 		//rb->keys[rb->write] = key;
-		rb->keys[rb->write] = malloc(sizeof(key)); // allocate some space
-		memcpy(rb->keys[rb->write], key, sizeof(key));
+		//rb->keys[rb->write] = malloc(sizeof(key)); // allocate some space
+		//memcpy(rb->keys[rb->write], key, sizeof(key));
+		rb->keys[rb->write] = malloc(size);
+		memcpy(rb->keys[rb->write], key, size);
 		rb->write++;
 		rb->write %= rb->num_keys;
 		rb->fill++;
