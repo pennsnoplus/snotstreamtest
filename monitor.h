@@ -1,10 +1,10 @@
 #include "pkt_types.h"
 #include "pkt_utils.h"
-#include "ringbuf.h"
+#include "lib/ringbuf/ringbuf.h"
 
 #define MAX_MON_CONS 10
-#define SERVER "http://snoplus:snoplustest@snoplus.cloudant.com"
-#define DATABASE "pmt-test"
+#define SERVER "localhost:5984"//"snoplus:snoplustest@snoplus.cloudant.com"
+#define DATABASE "pmt_test"
 
 /*
  * Structures
@@ -57,9 +57,10 @@ void help(char *UNUSED, void *_UNUSED);
 void delete_con(connection * con);
 int get_con_type(char *typestr);
 char *get_con_typestr(con_type type);
+void *upload_buffer(void *ptr);
 
 // Data Handlers
-void *handle_xl3(void *data_pkt);
+void handle_xl3(void *data_pkt);
 
 // Data Callbacks
 static void data_read_cb(struct bufferevent *bev, void *ctx);

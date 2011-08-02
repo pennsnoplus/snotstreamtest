@@ -21,7 +21,6 @@
 #include "monitor.h"
 #include "lib/json/json.h"
 #include "lib/pouch/pouch.h"
-//#include "ringbuf.h"
 
 // Helper Functions
 void delete_con(connection * con) {
@@ -73,7 +72,25 @@ char *get_con_typestr(con_type type){
 			return "UNKNOWN";
 	}
 }
-	
+
+void *upload_buffer(void *ptr){
+	Ringbuf *rbuf = (Ringbuf *)ptr;
+	pouch_request *pr;
+	char *datastr;
+	puts("upload buffer: ring buffer is full");
+	while(!ringbuf_isempty(rbuf)){
+		pr = pr_init();
+		ringbuf_pop(rbuf, (void **)&datastr);
+		pr = doc_create(pr, SERVER, DATABASE, datastr);
+		pr_do(pr);
+		free(datastr);
+		pr_free(pr);
+	}
+	puts("upload buffer: ring buffer is empty");
+	ringbuf_clear(rbuf);
+	free(rbuf);
+	pthread_exit(NULL);
+}
 // Commands
 void help(char *UNUSED, void *_UNUSED){
 	int i;
@@ -172,23 +189,13 @@ void start_con(char *inbuf, void *UNUSED) {
 }
 
 // Data Handlers
-void *handle_xl3(void *data_pkt){
-	if(ringbuf_isfull(xl3_buf)){
-		puts("xl3 ring buffer is full");
-		pouch_request *pr;
-		char *datastr;
-		while(!ringbuf_isempty(xl3_buf)){
-			pr = pr_init();
-			ringbuf_pop(xl3_buf, (void **)&datastr);
-			pr = doc_create(pr, SERVER, DATABASE, datastr);
-			pr_do(pr);
-			free(datastr);
-			puts("... flushed xl3 JSON");
-		}
-		pr_free(pr);
-		puts("xl3 ring buffer is empty");
-	}
-
+void handle_xl3(void *data_pkt){
+	
+	// TODO: This is very bad. While uploading, data is being added. O_o that's not good at all...
+	// 		 againn, some sort of fix is needed. 
+	puts("-------------");
+	ringbuf_status(xl3_buf, "handle_ ");
+	puts("-------------");
 	XL3_Packet *xpkt = (XL3_Packet *)data_pkt;
 	XL3_CommandHeader cmhdr = (XL3_CommandHeader)xpkt->cmdHeader;
 	PMTBundle *bndl_array = (PMTBundle *)(xpkt->payload);
@@ -239,7 +246,7 @@ void *handle_xl3(void *data_pkt){
 		
 		// add data to buffer
 		char *datastr = json_encode(data);
-		ringbuf_push(xl3_buf, (void *)datastr);
+		ringbuf_push((xl3_buf), ((void *)datastr), (strlen(datastr)+1));
 		json_delete(data);
 		free(datastr);
 		
@@ -256,7 +263,27 @@ void *handle_xl3(void *data_pkt){
 	}
 	//puts("uploaded XL3 bundle");
 	free(data_pkt);
-	pthread_exit(NULL);
+	
+	if(ringbuf_isfull(xl3_buf)){
+		printf("xl3_buf is full\n");
+		int rc = 0;
+		pthread_t thread;
+		Ringbuf *tmpbuf = ringbuf_copy(xl3_buf);
+		rc = pthread_create(&thread, NULL, upload_buffer, tmpbuf); // TODO: Mutex lock this, or come up with a better strategy for uploads
+		/*
+		 * Maybe create a buffer event of stuff to upload? the only problem is that it's not all the same width... if the data
+		 * were fixed width then you could just create a bufferevent and set the watermark to num_things * sizeof(thing). Or, maybe use a separator?
+		 * Could be really weird and awful, but I *really* don't like the use of global variables here.
+		 * 
+		 * What I've ended up doing is just copying the data, essentially.
+		 */
+		if (rc) {
+			fprintf(stderr, "ERROR: return code from pthread_create() is %d\n", rc);
+		}
+		else{
+			puts("Created new upload thread");
+		}
+	}
 }
 
 // Data Callbacks
@@ -286,20 +313,15 @@ static void data_read_cb(struct bufferevent *bev, void *ctx) {
 		}
 		memcpy(tmp_pkt, &data_pkt, con->pktsize);
 
-		pthread_t thread;
-		int rc=0;
 		switch (con->type){
 			case XL3:
-				rc = pthread_create(&thread, NULL, handle_xl3, (void *)tmp_pkt);
+				handle_xl3(tmp_pkt);
+				//rc = pthread_create(&thread, NULL, handle_xl3, (void *)tmp_pkt);
 				break;
 			default:
 				printf("not sure how to handle this data.\n");
 				break;
 		}
-		if (rc) {
-			fprintf(stderr, "ERROR: return code from pthread_create() is %d\n", rc);
-		}
-		
 	}
 }
 
@@ -397,7 +419,7 @@ int main(int argc, char **argv) {
 	}
 	// Initialize the XL3 out buffer
 	//xl3_buf = ringbuf_init(&xl3_buf, 100000);	//100,000
-	xl3_buf = ringbuf_init(&xl3_buf, 10);
+	xl3_buf = ringbuf_init(&xl3_buf, 3*120);
 
 	// Configure our event_base to be fast
 	struct event_config *cfg;

@@ -17,12 +17,12 @@ void ringbuf_clear(Ringbuf *rb);
 // "copy" (move)
 Ringbuf *ringbuf_copy(Ringbuf *rb);
 // debugging
-void ringbuf_status(Ringbuf *rb);
+void ringbuf_status(Ringbuf *rb, char *pref);
 // state
 int ringbuf_isfull(Ringbuf *rb);
 int ringbuf_isempty(Ringbuf *rb);
 // add / remove
-int ringbuf_push(Ringbuf *rb, void *key);
+int ringbuf_push(Ringbuf *rb, void *key, size_t size);
 int ringbuf_pop(Ringbuf *rb, void **dest);
 int ringbuf_insert(Ringbuf *rb, int elem, void *key, int overwrite);
 int ringbuf_get(Ringbuf *rb, int elem, void **dest);
