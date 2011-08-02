@@ -43,7 +43,7 @@ Yeah, that's vague, but that's the spec I have, too.
     + accept controller commands: (DONE)
         + CREATE/DELETE connections (DONE)
         + SHOW          all connections (DONE)
-		+ HELP			get list of valid commands
+		+ HELP			get list of valid commands (DONE)
     + get data from connections (filter buffers?) (DONE)
         + switch on the connection type, but basically: (DONE)
             + check to see how much data is in the buffer (DONE)
@@ -54,9 +54,9 @@ Yeah, that's vague, but that's the spec I have, too.
 
 ### Callbacks ###
 1. READ
-    + uploads the data
+    + uploads the data (YES)
 2. WRITE
-    + "successful write to <place>"
+    + "successful write to <place>" (NO)
 3. EVENT
-    + nothing?
+    + nothing? (CLOSES CONNECTION)
 

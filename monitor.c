@@ -22,6 +22,8 @@
 #include "lib/json/json.h"
 #include "lib/pouch/pouch.h"
 
+int bundle_counter = 0;
+
 // Helper Functions
 void delete_con(connection * con) {
 	if (con->host)
@@ -77,7 +79,7 @@ void *upload_buffer(void *ptr){
 	Ringbuf *rbuf = (Ringbuf *)ptr;
 	pouch_request *pr;
 	char *datastr;
-	puts("upload buffer: ring buffer is full");
+	printf("-- Uploading Ringbuf %p\n", rbuf);
 	while(!ringbuf_isempty(rbuf)){
 		pr = pr_init();
 		ringbuf_pop(rbuf, (void **)&datastr);
@@ -86,7 +88,7 @@ void *upload_buffer(void *ptr){
 		free(datastr);
 		pr_free(pr);
 	}
-	puts("upload buffer: ring buffer is empty");
+	printf("-- Finished uploading Ringbuf %p\n", rbuf);
 	ringbuf_clear(rbuf);
 	free(rbuf);
 	pthread_exit(NULL);
@@ -190,12 +192,7 @@ void start_con(char *inbuf, void *UNUSED) {
 
 // Data Handlers
 void handle_xl3(void *data_pkt){
-	
-	// TODO: This is very bad. While uploading, data is being added. O_o that's not good at all...
-	// 		 againn, some sort of fix is needed. 
-	puts("-------------");
-	ringbuf_status(xl3_buf, "handle_ ");
-	puts("-------------");
+	return;
 	XL3_Packet *xpkt = (XL3_Packet *)data_pkt;
 	XL3_CommandHeader cmhdr = (XL3_CommandHeader)xpkt->cmdHeader;
 	PMTBundle *bndl_array = (PMTBundle *)(xpkt->payload);
@@ -249,45 +246,30 @@ void handle_xl3(void *data_pkt){
 		ringbuf_push((xl3_buf), ((void *)datastr), (strlen(datastr)+1));
 		json_delete(data);
 		free(datastr);
-		
-		/*
-		// send the data
-		pouch_request *pr = pr_init();
-		pr = doc_create(pr, SERVER, DATABASE, datastr);
-		pr_do(pr);
-		// clean up
-		pr_free(pr);
-		json_delete(data);
-		free(datastr);
-		*/
 	}
-	//puts("uploaded XL3 bundle");
 	free(data_pkt);
-	
+
+	// If the buffer is full, spawn a new thread to upload it
 	if(ringbuf_isfull(xl3_buf)){
 		printf("xl3_buf is full\n");
 		int rc = 0;
 		pthread_t thread;
 		Ringbuf *tmpbuf = ringbuf_copy(xl3_buf);
-		rc = pthread_create(&thread, NULL, upload_buffer, tmpbuf); // TODO: Mutex lock this, or come up with a better strategy for uploads
-		/*
-		 * Maybe create a buffer event of stuff to upload? the only problem is that it's not all the same width... if the data
-		 * were fixed width then you could just create a bufferevent and set the watermark to num_things * sizeof(thing). Or, maybe use a separator?
-		 * Could be really weird and awful, but I *really* don't like the use of global variables here.
-		 * 
-		 * What I've ended up doing is just copying the data, essentially.
-		 */
+		rc = pthread_create(&thread, NULL, upload_buffer, tmpbuf);
 		if (rc) {
 			fprintf(stderr, "ERROR: return code from pthread_create() is %d\n", rc);
-		}
-		else{
-			puts("Created new upload thread");
 		}
 	}
 }
 
 // Data Callbacks
+int __a=0;
 static void data_read_cb(struct bufferevent *bev, void *ctx) {
+	if (!(__a%100))
+		printf("%d\n", __a++);
+	else
+		__a++;
+	return;
 	/* This callback is invoked when there is data to read on bev. */
 	struct evbuffer *input = bufferevent_get_input(bev);
 	//struct evbuffer *output = bufferevent_get_output(bev);
@@ -303,8 +285,7 @@ static void data_read_cb(struct bufferevent *bev, void *ctx) {
 		memset(&data_pkt, 0, con->pktsize);
 
 		n = evbuffer_remove(input, data_pkt, con->pktsize);
-		printf("Processing %s data packet (%d bytes)\n", get_con_typestr(con->type), (int)(con->pktsize));
-
+		//printf("Processing %s data packet (%d bytes)\n", get_con_typestr(con->type), (int)(con->pktsize));
 		// build a temporary packet for each thread
 		char *tmp_pkt = (char *)malloc(con->pktsize);
 		if (!tmp_pkt){
@@ -316,7 +297,6 @@ static void data_read_cb(struct bufferevent *bev, void *ctx) {
 		switch (con->type){
 			case XL3:
 				handle_xl3(tmp_pkt);
-				//rc = pthread_create(&thread, NULL, handle_xl3, (void *)tmp_pkt);
 				break;
 			default:
 				printf("not sure how to handle this data.\n");
@@ -418,8 +398,9 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 	// Initialize the XL3 out buffer
-	//xl3_buf = ringbuf_init(&xl3_buf, 100000);	//100,000
-	xl3_buf = ringbuf_init(&xl3_buf, 3*120);
+	//xl3_buf = ringbuf_init(&xl3_buf, 3*120); // testing w/ fakedata
+	//xl3_buf = ringbuf_init(&xl3_buf, 100000); //100,000, testing w/ Richie's fake data
+	xl3_buf = ringbuf_init(&xl3_buf, 1000000);
 
 	// Configure our event_base to be fast
 	struct event_config *cfg;
