@@ -9,10 +9,14 @@ Ringbuf *ringbuf_init(Ringbuf **rb, int num_keys){
 	*rb = malloc(sizeof(Ringbuf));
 	(*rb)->keys = malloc(num_keys*sizeof(void *));
 	int m_alloced = sizeof(Ringbuf)+num_keys*sizeof(void *);
+	int i;
 	if (*rb){
-		printf("Initializing ring buffer: keys[%d] (%d KB allocated)\n", num_keys, m_alloced/1000);
+		printf("Initializing ring buffer: keys[%d] (%d KB allocated)\n", num_keys, m_alloced/1024);
 		memset(*rb, 0, sizeof(*rb));
 		(*rb)->num_keys = num_keys;
+		for(i = 0; i < num_keys; i++){
+			(*rb)->keys[i] = NULL;
+		}
 		(*rb)->write = 0;
 		(*rb)->read = 0;
 		(*rb)->fill = 0;
@@ -38,7 +42,7 @@ Ringbuf *ringbuf_copy(Ringbuf *rb){
 	Ringbuf *out;
 	out = ringbuf_init(&out, rb->num_keys);
 	int i;
-	for(i = 0; i < rb->num_keys; i++){
+	for(i = rb->read; i != rb->write; i=(i+1)%(rb->num_keys)){
 		out->keys[i] = rb->keys[i]; // now out is in charge of the memory
 		rb->keys[i] = NULL;
 	}
@@ -69,15 +73,14 @@ int ringbuf_isempty(Ringbuf *rb){
 	return ( ((rb->write) == (rb->read)) && (rb->fill == 0) );
 }
 // add / remove
-//int ringbuf_push(Ringbuf *rb, void *key, size_t size){
 int ringbuf_push(Ringbuf *rb, void *key, size_t size){
 	int full = ringbuf_isfull(rb);
 	if (!full){
-		//rb->keys[rb->write] = key;
+		rb->keys[rb->write] = key;
 		//rb->keys[rb->write] = malloc(sizeof(key)); // allocate some space
 		//memcpy(rb->keys[rb->write], key, sizeof(key));
-		rb->keys[rb->write] = malloc(size);
-		memcpy(rb->keys[rb->write], key, size);
+		//rb->keys[rb->write] = malloc(size);
+		//memcpy(rb->keys[rb->write], key, size);
 		rb->write++;
 		rb->write %= rb->num_keys;
 		rb->fill++;

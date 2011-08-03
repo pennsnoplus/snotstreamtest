@@ -78,16 +78,40 @@ char *get_con_typestr(con_type type){
 void *upload_buffer(void *ptr){
 	Ringbuf *rbuf = (Ringbuf *)ptr;
 	pouch_request *pr;
-	char *datastr;
+	//char *datastr;
+	JsonNode *data;
+	uint32_t qhs = 0;
+	uint32_t qlx = 0;
+	uint32_t qhl = 0;
 	printf("-- Uploading Ringbuf %p\n", rbuf);
+	int i=0;
 	while(!ringbuf_isempty(rbuf)){
-		pr = pr_init();
-		ringbuf_pop(rbuf, (void **)&datastr);
-		pr = doc_create(pr, SERVER, DATABASE, datastr);
-		pr_do(pr);
-		free(datastr);
-		pr_free(pr);
+		//pr = pr_init();
+		//ringbuf_pop(rbuf, (void **)&datastr);
+		ringbuf_pop(rbuf, (void **)&data);
+		qhs = qhs + json_get_number(json_find_member(data, "qhs"));
+		qlx = qlx + json_get_number(json_find_member(data, "qlx"));
+		qhl = qhl + json_get_number(json_find_member(data, "qhl"));
+		i++;
+		json_delete(data);
+		//pr = doc_create(pr, SERVER, DATABASE, datastr);
+		//pr_do(pr);
+		//free(datastr);
+		//pr_free(pr);
 	}
+	data = json_mkobject();
+	
+	json_append_member(data, "qhs_int_ave", json_mknumber(((double)qhs)/i));
+	json_append_member(data, "qlx_int_ave", json_mknumber(((double)qlx)/i));
+	json_append_member(data, "qhl_int_ave", json_mknumber(((double)qhl)/i));
+	char *datastr = json_encode(data);
+	pr = pr_init();
+	pr = doc_create(pr, SERVER, DATABASE, datastr);
+	pr_do(pr);
+	free(datastr);
+	json_delete(data);
+	pr_free(pr);
+
 	printf("-- Finished uploading Ringbuf %p\n", rbuf);
 	ringbuf_clear(rbuf);
 	free(rbuf);
@@ -201,58 +225,64 @@ void handle_xl3(void *data_pkt){
 	JsonNode *data;
 	for(i = 0; i < sizeof(xpkt->payload)/sizeof(PMTBundle); i++){
 		// fill the bundle
-		uint32_t bndl[3];
-		memcpy(bndl, &bndl_array[i],sizeof(bndl));
+		//uint32_t bndl[3];
+		//memcpy(bndl, &bndl_array[i],sizeof(bndl));
 		// unpack the bundle
-		uint32_t chan,cell,gt24,gt16,gt8,qlx,qhs,qhl,tac,cmos16,cgt16,cgt24,missed,lgi,nc_cc,crate,board;
-		chan = (uint32_t) UNPK_CHANNEL_ID(bndl);
-		cell = (uint32_t) UNPK_CELL_ID(bndl);
-		gt24 = (uint32_t) UNPK_FEC_GT24_ID(bndl);
-		gt16 = (uint32_t) UNPK_FEC_GT16_ID(bndl);
-		gt8 = (uint32_t) UNPK_FEC_GT8_ID(bndl);
-		qlx = (uint32_t) UNPK_QLX(bndl);
-		qhs = (uint32_t) UNPK_QHS(bndl);
-		qhl = (uint32_t) UNPK_QHL(bndl);
-		tac = (uint32_t) UNPK_TAC(bndl);
-		cmos16 = (uint32_t) UNPK_CMOS_ES_16(bndl);
-		cgt16 = (uint32_t) UNPK_CGT_ES_16(bndl);
-		cgt24 = (uint32_t) UNPK_CGT_ES_24(bndl);
-		missed = (uint32_t) UNPK_MISSED_COUNT(bndl);
-		lgi = (uint32_t) UNPK_LGI_SELECT(bndl);
-		nc_cc = (uint32_t) UNPK_NC_CC(bndl);
-		crate = (uint32_t) UNPK_CRATE_ID(bndl);
-		board = (uint32_t) UNPK_BOARD_ID(bndl);
+		//uint32_t chan,cell,gt24,gt16,gt8,qlx,qhs,qhl,tac,cmos16,cgt16,cgt24,missed,lgi,nc_cc,crate,board;
+		uint32_t qlx, qhs, qhl;
+		//chan = (uint32_t) UNPK_CHANNEL_ID(bndl);
+		//cell = (uint32_t) UNPK_CELL_ID(bndl);
+		//gt24 = (uint32_t) UNPK_FEC_GT24_ID(bndl);
+		//gt16 = (uint32_t) UNPK_FEC_GT16_ID(bndl);
+		//gt8 = (uint32_t) UNPK_FEC_GT8_ID(bndl);
+		qlx = (uint32_t) UNPK_QLX((uint32_t *)&bndl_array[i]);
+		qhs = (uint32_t) UNPK_QHS((uint32_t *)&bndl_array[i]);
+		qhl = (uint32_t) UNPK_QHL((uint32_t *)&bndl_array[i]);
+		//tac = (uint32_t) UNPK_TAC(bndl);
+		//cmos16 = (uint32_t) UNPK_CMOS_ES_16(bndl);
+		//cgt16 = (uint32_t) UNPK_CGT_ES_16(bndl);
+		//cgt24 = (uint32_t) UNPK_CGT_ES_24(bndl);
+		//missed = (uint32_t) UNPK_MISSED_COUNT(bndl);
+		//lgi = (uint32_t) UNPK_LGI_SELECT(bndl);
+		//nc_cc = (uint32_t) UNPK_NC_CC(bndl);
+		//crate = (uint32_t) UNPK_CRATE_ID(bndl);
+		//board = (uint32_t) UNPK_BOARD_ID(bndl);
 		// create the JSON object
 		data = json_mkobject();
-		json_append_member(data, "chan", json_mknumber(chan));
-		json_append_member(data, "cell", json_mknumber(cell));
-		json_append_member(data, "gt24", json_mknumber(gt24));
-		json_append_member(data, "gt16", json_mknumber(gt16));
-		json_append_member(data, "gt8", json_mknumber(gt8));
+		//json_append_member(data, "chan", json_mknumber(chan));
+		//json_append_member(data, "cell", json_mknumber(cell));
+		//json_append_member(data, "gt24", json_mknumber(gt24));
+		//json_append_member(data, "gt16", json_mknumber(gt16));
+		//json_append_member(data, "gt8", json_mknumber(gt8));
 		json_append_member(data, "qlx", json_mknumber(qlx));
 		json_append_member(data, "qhs", json_mknumber(qhs));
 		json_append_member(data, "qhl", json_mknumber(qhl));
-		json_append_member(data, "tac", json_mknumber(tac));
-		json_append_member(data, "cmos16", json_mknumber(cmos16));
-		json_append_member(data, "cgt16", json_mknumber(cgt16));
-		json_append_member(data, "cgt24", json_mknumber(cgt24));
-		json_append_member(data, "missed", json_mknumber(missed));
-		json_append_member(data, "lgi", json_mknumber(lgi));
-		json_append_member(data, "nc_cc", json_mknumber(nc_cc));
-		json_append_member(data, "crate", json_mknumber(crate));
-		json_append_member(data, "board", json_mknumber(board));
+		//json_append_member(data, "tac", json_mknumber(tac));
+		//json_append_member(data, "cmos16", json_mknumber(cmos16));
+		//json_append_member(data, "cgt16", json_mknumber(cgt16));
+		//json_append_member(data, "cgt24", json_mknumber(cgt24));
+		//json_append_member(data, "missed", json_mknumber(missed));
+		//json_append_member(data, "lgi", json_mknumber(lgi));
+		//json_append_member(data, "nc_cc", json_mknumber(nc_cc));
+		//json_append_member(data, "crate", json_mknumber(crate));
+		//json_append_member(data, "board", json_mknumber(board));
 		
 		// add data to buffer
-		char *datastr = json_encode(data);
-		ringbuf_push((xl3_buf), ((void *)datastr), (strlen(datastr)+1));
-		json_delete(data);
-		free(datastr);
+		//char *datastr = json_encode(data);
+		//ringbuf_push((xl3_buf), ((void *)datastr), (strlen(datastr)+1));
+		//json_delete(data);
+		//free(datastr);
+		ringbuf_push(xl3_buf, data, 0); // TODO: fix push size
 	}
 	free(data_pkt);
 
 	// If the buffer is full, spawn a new thread to upload it
 	if(ringbuf_isfull(xl3_buf)){
-		printf("xl3_buf is full\n");
+		printf("RING_BUFFER_OVERFLOW_BUFFER_OVERFLOW\n");
+		printf("RING_BUFFER_OVERFLOW_BUFFER_OVERFLOW\n");
+		printf("RING_BUFFER_OVERFLOW_BUFFER_OVERFLOW\n");
+		printf("RING_BUFFER_OVERFLOW_BUFFER_OVERFLOW\n");
+		/*
 		int rc = 0;
 		pthread_t thread;
 		Ringbuf *tmpbuf = ringbuf_copy(xl3_buf);
@@ -260,6 +290,7 @@ void handle_xl3(void *data_pkt){
 		if (rc) {
 			fprintf(stderr, "ERROR: return code from pthread_create() is %d\n", rc);
 		}
+		*/
 	}
 }
 
@@ -517,7 +548,9 @@ int main(int argc, char **argv) {
 		if(monitoring_cons[cur_mon_con].valid)
 			delete_con(&monitoring_cons[cur_mon_con]);
 	}
+	// TODO: fix the fact that when a connection closes, it isn't freed
 	event_del(signal_event);
+	event_del(xl3_watcher);
 	free(signal_event);
 	evdns_base_free(dnsbase, 0);
 	event_base_free(base);
