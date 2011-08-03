@@ -3,7 +3,7 @@
 #include "lib/ringbuf/ringbuf.h"
 
 #define MAX_MON_CONS 10
-#define SERVER "localhost:5984"//"snoplus:snoplustest@snoplus.cloudant.com"
+#define SERVER /*"localhost:5984"*/"snoplus:snoplustest@snoplus.cloudant.com"
 #define DATABASE "pmt_test"
 
 /*

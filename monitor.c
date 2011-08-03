@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <arpa/inet.h>
+#include <time.h>
 
 // Libevent
 #include <event2/listener.h>
@@ -83,8 +84,9 @@ void *upload_buffer(void *ptr){
 	uint32_t qhs = 0;
 	uint32_t qlx = 0;
 	uint32_t qhl = 0;
-	printf("-- Uploading Ringbuf %p\n", rbuf);
+	//printf("-- Uploading Ringbuf %p\n", rbuf);
 	int i=0;
+	//ringbuf_status(rbuf, "-- ");
 	while(!ringbuf_isempty(rbuf)){
 		//pr = pr_init();
 		//ringbuf_pop(rbuf, (void **)&datastr);
@@ -100,10 +102,14 @@ void *upload_buffer(void *ptr){
 		//pr_free(pr);
 	}
 	data = json_mkobject();
-	
-	json_append_member(data, "qhs_int_ave", json_mknumber(((double)qhs)/i));
-	json_append_member(data, "qlx_int_ave", json_mknumber(((double)qlx)/i));
-	json_append_member(data, "qhl_int_ave", json_mknumber(((double)qhl)/i));
+	struct timeval tv;
+	gettimeofday(&tv,0);
+	double timestamp = ((double)tv.tv_sec) + ((double)tv.tv_usec)/1000000;
+	//printf("timestamp = %f\n", timestamp);
+	json_append_member(data, "qhs", json_mknumber(((double)qhs)/i));
+	json_append_member(data, "qlx", json_mknumber(((double)qlx)/i));
+	json_append_member(data, "qhl", json_mknumber(((double)qhl)/i));
+	json_append_member(data, "ts", json_mknumber(timestamp));
 	char *datastr = json_encode(data);
 	pr = pr_init();
 	pr = doc_create(pr, SERVER, DATABASE, datastr);
@@ -112,7 +118,7 @@ void *upload_buffer(void *ptr){
 	json_delete(data);
 	pr_free(pr);
 
-	printf("-- Finished uploading Ringbuf %p\n", rbuf);
+	//printf("-- Finished uploading Ringbuf %p\n", rbuf);
 	ringbuf_clear(rbuf);
 	free(rbuf);
 	pthread_exit(NULL);
@@ -359,6 +365,7 @@ static void buffer_timeout_cb(evutil_socket_t fd, short events, void *ctx){
 		int rc = 0;
 		pthread_t thread;
 		Ringbuf *tmpbuf = ringbuf_copy(rbuf);
+		//printf("finished copy\n");
 		rc = pthread_create(&thread, NULL, upload_buffer, tmpbuf);
 		if (rc) {
 			fprintf(stderr, "ERROR: return code from pthread_create() is %d\n", rc);
