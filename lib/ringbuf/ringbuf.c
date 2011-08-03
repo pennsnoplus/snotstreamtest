@@ -11,7 +11,7 @@ Ringbuf *ringbuf_init(Ringbuf **rb, int num_keys){
 	int m_alloced = sizeof(Ringbuf)+num_keys*sizeof(void *);
 	int i;
 	if (*rb){
-		printf("Initializing ring buffer: keys[%d] (%d KB allocated)\n", num_keys, m_alloced/1024);
+		//printf("Initializing ring buffer: keys[%d] (%d KB allocated)\n", num_keys, m_alloced/1024);
 		memset(*rb, 0, sizeof(*rb));
 		(*rb)->num_keys = num_keys;
 		for(i = 0; i < num_keys; i++){
@@ -40,14 +40,24 @@ void ringbuf_clear(Ringbuf *rb){
 }
 Ringbuf *ringbuf_copy(Ringbuf *rb){
 	Ringbuf *out;
-	out = ringbuf_init(&out, rb->num_keys);
+	out = ringbuf_init(&out, rb->fill+1);
 	int i;
+	/*
 	for(i = rb->read; i != rb->write; i=(i+1)%(rb->num_keys)){
 		out->keys[i] = rb->keys[i]; // now out is in charge of the memory
 		rb->keys[i] = NULL;
 	}
-	out->write = rb->write;
-	out->read = rb->read;
+	*/
+	int offset = rb->read;
+	for(i = rb->read; i != rb->write; i=(i+1)%(rb->num_keys)){
+		//printf("%d %d %lu\n", i-offset, i, rb->write);
+		out->keys[i-offset] = rb->keys[i];
+		rb->keys[i] = NULL;
+	}
+	//out->write = rb->write;
+	//out->read = rb->read;
+	out->read = 0;
+	out->write = rb->fill;
 	out->fill = rb->fill;
 	rb->write = 0;
 	rb->read = 0;
