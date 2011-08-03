@@ -13,6 +13,20 @@ then takes the data from them and does stuff with it.
 
 Yeah, that's vague, but that's the spec I have, too.
 
+# CouchApp Resources #
++ [Anatomy of a CouchApp](http://mindeavor.com/blog/the-anatomy-of-a-couchapp)
++ [Formatting with Show and List](http://wiki.apache.org/couchdb/Formatting_with_Show_and_List)
++ [Evently and CouchApp](http://couchapp.couchone.com/docs/_design/docs/index.html#/topic/evently)
++ [jQuery Mobile + Templates + CouchApp](http://custardbelly.com/blog/2010/12/28/jquery-mobile-couchdb-part-3-templates-and-mustache-js/)
++ [Lists, Shows, and Models (slideshow)](http://xerexen.com/posts/lists-shows-and-models)
++ [Evently DIY pt. II - State](http://couchapp.org/page/evently-do-it-yourself-ii-state)
++ [Evently Primer](http://couchapp.org/page/evently-primer)
++ [Notes On Pages Files])(http://couchapp.org/page/NotesOnPagesFiles)
++ [Database Queries the CouchDB Way](http://sitr.us/2009/06/30/database-queries-the-couchdb-way.html)
++ [CouchDB - The Definitive Guide](http://guide.couchdb.org/index.html)
++ [Reference](http://daleharvey.github.com/jquery.couch.js-docs/symbols/%24.couch.db.html)
++ [Using jQuery and CouchDB for webapps](http://blog.edparcell.com/using-jquery-and-couchdb-to-build-a-simple-we)
+
 # Notes #
 + possible to avoid doing data copies
     + http://www.wangafu.net/~nickm/libevent+book/Ref7_evbuffer.html
