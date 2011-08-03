@@ -1,0 +1,18 @@
+<h3>{{name}}'s Recent Items:</h3>
+<table>
+<tr>
+	<td>Doc ID</td>
+	<td>Timestamp</td>
+	<td>QHL</td>
+	<td>QHS</td>
+	<td>QLX</td>
+</tr>
+{{#items}}
+<tr>
+	<td>{{_id}}</td>
+	<td>{{ts}}</td>
+	<td>{{qhl}}</td>
+	<td>{{qhs}}</td>
+	<td>{{qlx}}</td>
+</tr>
+{{/items}}

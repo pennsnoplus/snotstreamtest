@@ -1,0 +1,13 @@
+{
+	"env":{
+		"default":{
+			"db":"http://snoplus:snoplustest@snoplus.cloudant.com/pmt_test"
+		},
+		"remote":{
+			"db":"http://snoplus:snoplustest@snoplus.cloudant.com/pmt_test"
+		},
+		"local":{
+			"db":"http://localhost:5984/pmt_test"
+		}
+	}
+}
