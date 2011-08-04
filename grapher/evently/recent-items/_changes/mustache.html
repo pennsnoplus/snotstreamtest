@@ -1,18 +1,20 @@
-<h3>{{name}}'s Recent Items:</h3>
+<h3>Last 10 Items:</h3>
+<div id="recent_items_graph"></div>
 <table>
 <tr>
-	<td>Doc ID</td>
-	<td>Timestamp</td>
-	<td>QHL</td>
-	<td>QHS</td>
-	<td>QLX</td>
+	<td><p>Doc ID</p></td>
+	<td><p>Timestamp</p></td>
+	<td><p>QHL</p></td>
+	<td><p>QHS</p></td>
+	<td><p>QLX</p></td>
 </tr>
 {{#items}}
 <tr>
-	<td>{{_id}}</td>
-	<td>{{ts}}</td>
-	<td>{{qhl}}</td>
-	<td>{{qhs}}</td>
-	<td>{{qlx}}</td>
+	<td><p>{{_id}}</p></td>
+	<td><p>{{ts}}</p></td>
+	<td><p>{{qhl}}</p></td>
+	<td><p>{{qhs}}</p></td>
+	<td><p>{{qlx}}</p></td>
 </tr>
 {{/items}}
+</table>

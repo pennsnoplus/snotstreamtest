@@ -1,29 +1,30 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>My New CouchApp</title>
+    <title>PMT Monitor</title>
     <link rel="stylesheet" href="style/main.css" type="text/css">
   </head>
   <body>
-    <div id="account"></div>
 
-    <h1>Generated CouchApp</h1>
+    <center>
+  	  <h1>PMT Monitor</title>
+	</center>
 
-    <div id="profile"></div>
-    <div id="items"></div>
+	<div class="data" id="recent-items"></div>
+	<div class="data" id="qhl"><p>EVEN MORE STUFF GOES HERE!!!!</p></div>
+  	<div class="data" id="qhs"><p>Stuff</p></div>
+	<div class="data" id="qlx"><h3>More Stuff</h3></div>
 
-    <div id="sidebar">
-      <p>Edit welcome message.</p>
-      <p>Ideas: You could easily turn this into a photo sharing app, or a grocery list, or a chat room.</p>
-    </div>
   </body>
+
   <script src="vendor/couchapp/loader.js"></script>
+
   <script type="text/javascript" charset="utf-8">
     $.couch.app(function(app) {
-      $("#account").evently("account", app);
-      $("#profile").evently("profile", app);
-      $.evently.connect("#account","#profile", ["loggedIn","loggedOut"]);
-      $("#items").evently("items", app);
+      $("#recent-items").evently("recent-items", app);
+	  $("#qhl").evently("qhl", app);
+	  $("#qhs").evently("qhs", app);
+	  $("#qlx").evently("qlx", app);
     });
   </script>
 </html>

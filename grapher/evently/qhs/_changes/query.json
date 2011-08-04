@@ -1,5 +1,5 @@
 {
-	"view" : "recent-items",
+	"view" : "qhs",
 	"descending" : "true",
 	"limit" : "10"
 }

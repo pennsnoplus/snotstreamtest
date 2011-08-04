@@ -1,5 +1,5 @@
 function(doc){
-	if(doc.qhs && doc.ts){
-		emit(doc.ts, doc.qhs);
+	if(doc.qlx && doc.ts){
+		emit(doc.ts, doc.qlx);
 	}
 }
