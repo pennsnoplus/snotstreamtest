@@ -13,8 +13,8 @@ then takes the data from them and does stuff with it.
 That's the vague version. Here's the full explanation.
 
 The program monitor.c is monitoring software written
-using [libevent](http://monkey.org/~provos/libevent/).
-It's primary purpose is to, well, monitor data connections.
+using [libevent](http://monkey.org/~provos/libevent/) for
+asynchronous IO. It's primary purpose is to, well, monitor data connections.
 By adding different types of data structures to the program,
 it's possible to monitor any well-defined type of data. Currently,
 the only defined monitoring type is for the XL3 - check out
@@ -67,9 +67,11 @@ Please don't judge the quality of this program from the code in this repository 
 testing that's happened so that everything would be ready for this conference. In theory,
 the program design is extremely elegant: to monitor a new type of data (maybe something
 from TUBII, or the CAEN boards, or the Event Builder), is to:
+
 1. define a data type (a ```struct```) for that type of connection,
 2. create a call back function for operating on incoming data, and
 3. create a function for uploading the operated-upon data.
+
 Then, all the data is sent to a CouchDB instance, where it can be accessed from
 anywhere.
 
@@ -102,7 +104,17 @@ To set up and run a demo, you must also have a copy of (Penn_daq)[https://github
  - ```make clean; make```
  - ```cd xl3_data_generator```
  - ```./make.sh```
-To start the demo, start penn_daq. Run the monitor. Using either telnet or tut (which is included in the Penn_daq directory), connect to the monitor (```(telnet|tut) localhost 2020```). Make sure that the monitor accepts this connection; try typing some input and pressing return, the monitor should print out what you typed. Then, from the telnet/tut connection, send ```start xl3 localhost 44598```; the monitor should say that it has started a connection, and penn_daq should print out that it has a monitor connected. Now, run porca. This will start generating XL3 data, which gets passed to penn_daq, from there to monitor, and from there to the CouchDB instance. Leave all of this running and check out the graph page - everything should be updating. If you're having trouble with any of these steps, feel free to email peter.l.downs@gmail.com. 
+
+To start the demo, start penn_daq. Run the monitor. Using either telnet or tut (which is included
+in the Penn_daq directory), connect to the monitor (```(telnet|tut) localhost 2020```). Make sure
+that the monitor accepts this connection; try typing some input and pressing return, the monitor
+should print out what you typed. 
+
+Then, from the telnet/tut connection, send ```start xl3 localhost 44598```; the monitor should say that it has started
+a connection, and penn_daq should print out that it has a monitor connected. Now, run porca. This will start generating
+XL3 data, which gets passed to penn_daq, from there to monitor, and from there to the CouchDB instance. Leave all of
+this running and check out the graph page - everything should be updating.
+If you're having trouble with any of these steps, feel free to email peter.l.downs@gmail.com. 
 
 # CouchApp Resources #
 + [Anatomy of a CouchApp](http://mindeavor.com/blog/the-anatomy-of-a-couchapp)
