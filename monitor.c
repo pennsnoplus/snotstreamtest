@@ -225,11 +225,33 @@ void start_con(char *inbuf, void *UNUSED) {
 void handle_xl3(void *data_pkt){
 	//return;
 	XL3_Packet *xpkt = (XL3_Packet *)data_pkt;
-	XL3_CommandHeader cmhdr = (XL3_CommandHeader)xpkt->cmdHeader;
+	//int z;
+	//char *bdata = (char *)data_pkt;
+	//for(z = 0; z < sizeof(XL3_Packet); z++){
+		//printf("%d : %08x\n", z, (int)(*(bdata+z)));
+	//}
+	XL3_CommandHeader cmhdr = (XL3_CommandHeader)(xpkt->cmdHeader);
 	PMTBundle *bndl_array = (PMTBundle *)(xpkt->payload);
+	
+	//printf("Num bundles = %d\n", cmhdr.num_bundles);
+	//printf("Packet type = %08x", cmhdr.packet_type);
+	//printf("Packet num = %08x", cmhdr.packet_num);
+	//printf("First PMT Bundle\n");
+	//printf("word1= %08x\nword2= %08x\nword3= %08x\n", bndl_array[0].word1, bndl_array[0].word2, bndl_array[0].word3);
+	//uint32_t _qlx, _qhs, _qhl;
+	//_qlx = (uint32_t) UNPK_QLX((uint32_t *)&bndl_array[0]);
+	//_qhs = (uint32_t) UNPK_QHS((uint32_t *)&bndl_array[0]);
+	//_qhl = (uint32_t) UNPK_QHL((uint32_t *)&bndl_array[0]);
+	//printf("qhl= %d\nqhs= %d\nqlx= %d\n", _qhl, _qhs, _qlx);
+	//printf("---------------\n");
+	
+	
 	int i;
 	JsonNode *data;
-	for(i = 0; i < sizeof(xpkt->payload)/sizeof(PMTBundle); i++){
+	//for(i = 0; i < sizeof(xpkt->payload)/sizeof(PMTBundle); i++){
+	for(i = 0; i < cmhdr.num_bundles; i++){
+		//printf("----------\n");
+		//printf("word1= %d\nword2= %d\nword3= %d\n", bndl_array[i].word1, bndl_array[i].word2, bndl_array[i].word3);
 		// fill the bundle
 		//uint32_t bndl[3];
 		//memcpy(bndl, &bndl_array[i],sizeof(bndl));
@@ -244,6 +266,8 @@ void handle_xl3(void *data_pkt){
 		qlx = (uint32_t) UNPK_QLX((uint32_t *)&bndl_array[i]);
 		qhs = (uint32_t) UNPK_QHS((uint32_t *)&bndl_array[i]);
 		qhl = (uint32_t) UNPK_QHL((uint32_t *)&bndl_array[i]);
+		//printf("qhl= %d\nqhs= %d\nqlx= %d\n", qhl, qhs, qlx);
+		//printf("----------\n");
 		//tac = (uint32_t) UNPK_TAC(bndl);
 		//cmos16 = (uint32_t) UNPK_CMOS_ES_16(bndl);
 		//cgt16 = (uint32_t) UNPK_CGT_ES_16(bndl);
@@ -528,9 +552,11 @@ int main(int argc, char **argv) {
 	// Create the XL3 data watcher
 //struct event *recurring_timer(struct event_base *base, struct timeval *interval, void (*user_cb)(evutil_socket_t, short, void *), void *user_data){
 	
-	struct timeval xl3_delay; // set the delay to .5 seconds
+	struct timeval xl3_delay; // set the delay to...
 	xl3_delay.tv_sec=0;
-	xl3_delay.tv_usec=500000;
+	//xl3_delay.tv_usec=500000; // .5 seconds
+	xl3_delay.tv_usec=50000;	// .05 seconds
+	//xl3_delay.tv_usec=5000;	// .005 seconds
 
 	xl3_watcher = event_new(base, -1, EV_TIMEOUT|EV_PERSIST, buffer_timeout_cb, xl3_buf);
 	if(!xl3_watcher){

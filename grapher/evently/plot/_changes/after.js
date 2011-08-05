@@ -17,12 +17,14 @@ function() {
 		else {
 			qhl.push([r.key, NULL]);
 		}
+
 		if(r.value.qhs != undefined){
 			qhs.push([r.key, r.value.qhs]);
 		}
 		else {
 			qhs.push([r.key, NULL]);
 		}
+
 		if(r.value.qlx != undefined){
 			qlx.push([r.key, r.value.qlx]);
 		}

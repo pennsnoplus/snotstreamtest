@@ -3,7 +3,8 @@
 	"options" : {
 		"lines"  : { "show": true },
 		"points" : { "show": false },
-		"xaxis"  : { "tickDecimals": 0, "tickSize": 1 }
+		"xaxis"  : { "tickDecimals": 0, "tickSize": 1 },
+		"legend" : { "show" : true }
 	},
 	
 	"dimensions" : { "width" : "800px", "height" : "400px" }
