@@ -46,7 +46,7 @@ To start the demo, start penn_daq. Run the monitor. Using either telnet or tut (
 + [Lists, Shows, and Models (slideshow)](http://xerexen.com/posts/lists-shows-and-models)
 + [Evently DIY pt. II - State](http://couchapp.org/page/evently-do-it-yourself-ii-state)
 + [Evently Primer](http://couchapp.org/page/evently-primer)
-+ [Notes On Pages Files])(http://couchapp.org/page/NotesOnPagesFiles)
++ [Notes On Pages Files](http://couchapp.org/page/NotesOnPagesFiles)
 + [Database Queries the CouchDB Way](http://sitr.us/2009/06/30/database-queries-the-couchdb-way.html)
 + [CouchDB - The Definitive Guide](http://guide.couchdb.org/index.html)
 + [Reference](http://daleharvey.github.com/jquery.couch.js-docs/symbols/%24.couch.db.html)
