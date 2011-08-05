@@ -6,12 +6,37 @@
 ""`+...+'"" 
 ```
 
-To compile everything, just use 'make'.
-
+# Description #
 SNO+_MON tries to connect to defined monitor points, and
 then takes the data from them and does stuff with it.
 
 Yeah, that's vague, but that's the spec I have, too.
+
+# Run the Demo #
+
+The way the demo program works is not at all simple.
+Fake XL3 packets are generated and sent to a CouchDB
+server hosted by Cloudant - view the source code to
+see exactly where.
+
+After the packets are uploaded, pretty graphs are created
+in Javascript using the Flot graphing library. [Here is that page.](http://snoplus.cloudant.com/pmt_test/_design/grapher/index.html)
+
+Data flow is as follows:
+
+```xl3_data_generator/porca``` -------> ```penn_daq``` -------> ```monitor``` -------> CouchDB instance
+
+To set up and run a demo, you must also have a copy of (Penn_daq)[https://github.com/pennsnoplus/Penn_daq].
+
+To compile penn_daq:
+ - ```cd path/to/penn/daq/directory```
+ - ```make clean; make```
+To compile monitor and porca:
+ - ```cd path/to/snot_mon/```
+ - ```make clean; make```
+ - ```cd xl3_data_generator```
+ - ```./make.sh```
+To start the demo, start penn_daq. Run the monitor. Using either telnet or tut (which is included in the Penn_daq directory), connect to the monitor (```(telnet|tut) localhost 2020```). Make sure that the monitor accepts this connection; try typing some input and pressing return, the monitor should print out what you typed. Then, from the telnet/tut connection, send ```start xl3 localhost 44598```; the monitor should say that it has started a connection, and penn_daq should print out that it has a monitor connected. Now, run porca. This will start generating XL3 data, which gets passed to penn_daq, from there to monitor, and from there to the CouchDB instance. Leave all of this running and check out the graph page - everything should be updating. If you're having trouble with any of these steps, feel free to email peter.l.downs@gmail.com. 
 
 # CouchApp Resources #
 + [Anatomy of a CouchApp](http://mindeavor.com/blog/the-anatomy-of-a-couchapp)
@@ -38,39 +63,3 @@ Yeah, that's vague, but that's the spec I have, too.
 		+ online examples
 			+ sandbox.c
 			+ hiperfifo.c
-
-# Structure #
-### Main ###
-1. Set up an event_base (DONE)
-    + only use epoll & kqueue (DONE)
-    + create the config (DONE)
-    + create the base (DONE)
-    + delete the config (DONE)
-2. Setup a dns_base (DONE)
-    + make it asynchronous
-    + this way, we can resolve hostnames asynchronously,
-      as opposed to blocking on resolves.
-2. Create a listener (DONE)
-    + be ready to accept a controller (DONE)
- 	+ have default connections?
-3. Run the main loop (event_base_dispatch base)
-    + accept controller commands: (DONE)
-        + CREATE/DELETE connections (DONE)
-        + SHOW          all connections (DONE)
-		+ HELP			get list of valid commands (DONE)
-    + get data from connections (filter buffers?) (DONE)
-        + switch on the connection type, but basically: (DONE)
-            + check to see how much data is in the buffer (DONE)
-            + if there is enough data to fill a packet (DONE)
-                + fill CONNECTION_TYPE packet (DONE)
-                + if DEBUG: show data, information about data
-                + UPLOAD to database (DONE)
-
-### Callbacks ###
-1. READ
-    + uploads the data (YES)
-2. WRITE
-    + "successful write to <place>" (NO)
-3. EVENT
-    + nothing? (CLOSES CONNECTION)
-
