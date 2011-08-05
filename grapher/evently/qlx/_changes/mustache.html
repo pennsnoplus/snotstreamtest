@@ -1,9 +1,12 @@
 <h3>Last 10 QLX values:</h3>
-<div id="qlx__graph"></div>
+{{#dimensions}}
+	<div id="qlx_graph" style="margin:20px;width:{{width}};height:{{height}};"></div>
+{{/dimensions}}
+<!--
 <table>
 <tr>
 	<td><p>Timestamp</p></td>
-	<td><p>QLX</p></td>
+	<td><p>qlx</p></td>
 </tr>
 {{#items}}
 <tr>
@@ -11,4 +14,4 @@
 	<td><p>{{qlx_value}}</p></td>
 </tr>
 {{/items}}
-</table>
+</table>-->

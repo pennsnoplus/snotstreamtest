@@ -1,9 +1,12 @@
 <h3>Last 10 QHS values:</h3>
-<div id="qhs__graph"></div>
+{{#dimensions}}
+	<div id="qhs_graph" style="margin:20px;width:{{width}};height:{{height}};"></div>
+{{/dimensions}}
+<!--
 <table>
 <tr>
 	<td><p>Timestamp</p></td>
-	<td><p>QHS</p></td>
+	<td><p>qhs</p></td>
 </tr>
 {{#items}}
 <tr>
@@ -11,4 +14,4 @@
 	<td><p>{{qhs_value}}</p></td>
 </tr>
 {{/items}}
-</table>
+</table>-->

@@ -1,5 +1,6 @@
 function(query_data){
 	var stash = {
+		dimensions: $$(this).evently.flot.dimensions,
 		items: query_data.rows.map(function(r){
 			return {
 				timestamp: r.key,
