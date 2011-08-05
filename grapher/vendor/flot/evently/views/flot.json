@@ -1,0 +1,12 @@
+{
+	"view" : "flot",
+	"startkey" : ["flot-series"],
+	"endkey"   : ["flot-series", {}],
+	"options" : {
+		"lines"  : { "show": true },
+		"points" : { "show": false },
+		"xaxis"  : { "tickDecimals": 0, "tickSize": 1 }
+	},
+	
+	"dimensions" : { "width" : "600px", "height" : "300px" }
+}

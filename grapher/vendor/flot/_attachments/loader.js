@@ -1,0 +1,10 @@
+couchapp_load([
+  "vendor/couchapp/jquery.pathbinder.js",
+  "vendor/flot/jquery.flot.js",
+  "vendor/flot/jquery.colorhelpers.js",
+  "vendor/flot/jquery.flot.crosshair.js",
+  "vendor/flot/jquery.flot.navigate.js",
+  "vendor/flot/jquery.flot.selection.js",
+  "vendor/flot/jquery.flot.stack.js",
+  "vendor/flot/jquery.flot.threshold.js"
+]);

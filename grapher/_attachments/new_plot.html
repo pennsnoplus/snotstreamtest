@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>My New CouchApp</title>
+    <link rel="stylesheet" href="style/main.css" type="text/css">
+  </head>
+  <body>
+<div id="wrap"> 
+<div id="header"></div>
+  <div id="sidebar1">  </div> 
+    <div id="account"></div>
+<div id="main">
+<div id="content">
+    <div id="account"></div>
+
+    <h1>Welcome the SNO+ proto</h1>
+    <div id="profile"></div>
+    <div id="flot_view"></div>
+</div> <!--content-->
+</div> <!--main-->
+</div> <!--wrap-->
+  </body>
+  <script src="vendor/couchapp/loader.js"></script>
+  <script src="vendor/flot/loader.js"></script>
+  <script type="text/javascript" charset="utf-8">
+    //$("#header").load("header.html");
+    //$("#sidebar1").load("sidebar.html");
+    $.couch.app(function(app) {
+      $("#account").evently("account", app);
+      $("#profile").evently("profile", app);
+      $.evently.connect("#account","#profile", ["loggedIn","loggedOut"]);
+      $("#flot_view").evently("plot", app);
+    });
+  </script>
+</html>

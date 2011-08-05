@@ -1,0 +1,10 @@
+{
+	"view" : "test",
+	"options" : {
+		"lines"  : { "show": true },
+		"points" : { "show": false },
+		"xaxis"  : { "tickDecimals": 0, "tickSize": 1 }
+	},
+	
+	"dimensions" : { "width" : "800px", "height" : "400px" }
+}
