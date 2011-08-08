@@ -84,8 +84,9 @@ changes, the graphs are redrawn, all in real-time.
 
 ## Dependencies ##
 
-[libCURL](http://curl.haxx.se/libcurl/)
-[libevent](http://monkey.org/~provos/libevent/)
++ [libCURL](http://curl.haxx.se/libcurl/)
+
++ [libevent](http://monkey.org/~provos/libevent/)
 
 ## How to ##
 
