@@ -82,6 +82,13 @@ changes, the graphs are redrawn, all in real-time.
 
 # Run the Demo #
 
+## Dependencies ##
+
+[libCURL](http://curl.haxx.se/libcurl/)
+[libevent](http://monkey.org/~provos/libevent/)
+
+## How to ##
+
 The way the demo program works is not at all simple.
 Fake XL3 packets are generated and sent to a CouchDB
 server hosted by Cloudant - view the source code to
