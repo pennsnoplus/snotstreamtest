@@ -79,43 +79,54 @@ char *get_con_typestr(con_type type){
 void *upload_buffer(void *ptr){
 	Ringbuf *rbuf = (Ringbuf *)ptr;
 	pouch_request *pr;
-	//char *datastr;
-	JsonNode *data;
-	uint32_t qhs = 0;
-	uint32_t qlx = 0;
-	uint32_t qhl = 0;
-	//printf("-- Uploading Ringbuf %p\n", rbuf);
-	int i=0;
-	//ringbuf_status(rbuf, "-- ");
+	int pmt;
+	pmt_upls *data;
+	//pmt_upls *pmts = (pmt_upls *)calloc(sizeof(pmt_upls)*9727) // huge calloc - maybe optimize?
+	pmt_upls pmts[9728] = {0}; // does this initialize to 0?
+
 	while(!ringbuf_isempty(rbuf)){
-		//pr = pr_init();
-		//ringbuf_pop(rbuf, (void **)&datastr);
 		ringbuf_pop(rbuf, (void **)&data);
-		qhs = qhs + json_get_number(json_find_member(data, "qhs"));
-		qlx = qlx + json_get_number(json_find_member(data, "qlx"));
-		qhl = qhl + json_get_number(json_find_member(data, "qhl"));
-		i++;
-		json_delete(data);
-		//pr = doc_create(pr, SERVER, DATABASE, datastr);
-		//pr_do(pr);
-		//free(datastr);
-		//pr_free(pr);
+		//pmt = 512*data.crate + 32*data.board + data.chan;
+		pmt = data->pmt;
+		pmts[pmt].qhs = pmts[pmt].qhs + data->qhs;
+		pmts[pmt].qhl = pmts[pmt].qhl + data->qhl;
+		pmts[pmt].qlx = pmts[pmt].qlx + data->qlx;
+		pmts[pmt].count++;
 	}
-	data = json_mkobject();
+
+	JsonNode *doc = json_mkobject();
+	
 	struct timeval tv;
 	gettimeofday(&tv,0);
 	double timestamp = ((double)tv.tv_sec) + ((double)tv.tv_usec)/1000000;
 	//printf("timestamp = %f\n", timestamp);
-	json_append_member(data, "qhs", json_mknumber(((double)qhs)/i));
-	json_append_member(data, "qlx", json_mknumber(((double)qlx)/i));
-	json_append_member(data, "qhl", json_mknumber(((double)qhl)/i));
-	json_append_member(data, "ts", json_mknumber(timestamp));
-	char *datastr = json_encode(data);
+	json_append_member(doc, "ts", json_mknumber(timestamp));
+
+	int i;
+	JsonNode *pmt_array = json_mkarray();
+	for(i = 0; i < 9728; i++){
+		JsonNode *pmt_json = json_mkobject();
+		if(!pmts[i].count){ // no divide by 0
+			pmts[i].count = 1;
+		}
+		json_append_member(pmt_json, "crate", json_mknumber((double)pmts[i].crate));
+		json_append_member(pmt_json, "board", json_mknumber((double)pmts[i].board));
+		json_append_member(pmt_json, "chan", json_mknumber((double)pmts[i].chan));
+		json_append_member(pmt_json, "pmt", json_mknumber((double)pmts[i].pmt));
+		json_append_member(pmt_json, "qhs", json_mknumber(((double)pmts[i].qhs)/pmts[i].count));
+		json_append_member(pmt_json, "qhl", json_mknumber(((double)pmts[i].qhl)/pmts[i].count));
+		json_append_member(pmt_json, "qlx", json_mknumber(((double)pmts[i].qlx)/pmts[i].count));
+		json_append_element(pmt_array, pmt_json);
+	}
+
+	json_append_member(doc, "pmts", pmt_array);
+
+	char *datastr = json_encode(doc);
 	pr = pr_init();
 	pr = doc_create(pr, SERVER, DATABASE, datastr);
 	pr_do(pr);
 	free(datastr);
-	json_delete(data);
+	json_delete(doc);
 	pr_free(pr);
 
 	//printf("-- Finished uploading Ringbuf %p\n", rbuf);
@@ -223,104 +234,29 @@ void start_con(char *inbuf, void *UNUSED) {
 
 // Data Handlers
 void handle_xl3(void *data_pkt){
-	//return;
 	XL3_Packet *xpkt = (XL3_Packet *)data_pkt;
-	//int z;
-	//char *bdata = (char *)data_pkt;
-	//for(z = 0; z < sizeof(XL3_Packet); z++){
-		//printf("%d : %08x\n", z, (int)(*(bdata+z)));
-	//}
 	XL3_CommandHeader cmhdr = (XL3_CommandHeader)(xpkt->cmdHeader);
 	PMTBundle *bndl_array = (PMTBundle *)(xpkt->payload);
 	
-	//printf("Num bundles = %d\n", cmhdr.num_bundles);
-	//printf("Packet type = %08x", cmhdr.packet_type);
-	//printf("Packet num = %08x", cmhdr.packet_num);
-	//printf("First PMT Bundle\n");
-	//printf("word1= %08x\nword2= %08x\nword3= %08x\n", bndl_array[0].word1, bndl_array[0].word2, bndl_array[0].word3);
-	//uint32_t _qlx, _qhs, _qhl;
-	//_qlx = (uint32_t) UNPK_QLX((uint32_t *)&bndl_array[0]);
-	//_qhs = (uint32_t) UNPK_QHS((uint32_t *)&bndl_array[0]);
-	//_qhl = (uint32_t) UNPK_QHL((uint32_t *)&bndl_array[0]);
-	//printf("qhl= %d\nqhs= %d\nqlx= %d\n", _qhl, _qhs, _qlx);
-	//printf("---------------\n");
-	
-	
 	int i;
-	JsonNode *data;
-	//for(i = 0; i < sizeof(xpkt->payload)/sizeof(PMTBundle); i++){
+	pmt_upls *data;
 	for(i = 0; i < cmhdr.num_bundles; i++){
-		//printf("----------\n");
-		//printf("word1= %d\nword2= %d\nword3= %d\n", bndl_array[i].word1, bndl_array[i].word2, bndl_array[i].word3);
-		// fill the bundle
-		//uint32_t bndl[3];
-		//memcpy(bndl, &bndl_array[i],sizeof(bndl));
-		// unpack the bundle
-		//uint32_t chan,cell,gt24,gt16,gt8,qlx,qhs,qhl,tac,cmos16,cgt16,cgt24,missed,lgi,nc_cc,crate,board;
-		uint32_t qlx, qhs, qhl;
-		//chan = (uint32_t) UNPK_CHANNEL_ID(bndl);
-		//cell = (uint32_t) UNPK_CELL_ID(bndl);
-		//gt24 = (uint32_t) UNPK_FEC_GT24_ID(bndl);
-		//gt16 = (uint32_t) UNPK_FEC_GT16_ID(bndl);
-		//gt8 = (uint32_t) UNPK_FEC_GT8_ID(bndl);
-		qlx = (uint32_t) UNPK_QLX((uint32_t *)&bndl_array[i]);
-		qhs = (uint32_t) UNPK_QHS((uint32_t *)&bndl_array[i]);
-		qhl = (uint32_t) UNPK_QHL((uint32_t *)&bndl_array[i]);
-		//printf("qhl= %d\nqhs= %d\nqlx= %d\n", qhl, qhs, qlx);
-		//printf("----------\n");
-		//tac = (uint32_t) UNPK_TAC(bndl);
-		//cmos16 = (uint32_t) UNPK_CMOS_ES_16(bndl);
-		//cgt16 = (uint32_t) UNPK_CGT_ES_16(bndl);
-		//cgt24 = (uint32_t) UNPK_CGT_ES_24(bndl);
-		//missed = (uint32_t) UNPK_MISSED_COUNT(bndl);
-		//lgi = (uint32_t) UNPK_LGI_SELECT(bndl);
-		//nc_cc = (uint32_t) UNPK_NC_CC(bndl);
-		//crate = (uint32_t) UNPK_CRATE_ID(bndl);
-		//board = (uint32_t) UNPK_BOARD_ID(bndl);
-		// create the JSON object
-		data = json_mkobject();
-		//json_append_member(data, "chan", json_mknumber(chan));
-		//json_append_member(data, "cell", json_mknumber(cell));
-		//json_append_member(data, "gt24", json_mknumber(gt24));
-		//json_append_member(data, "gt16", json_mknumber(gt16));
-		//json_append_member(data, "gt8", json_mknumber(gt8));
-		json_append_member(data, "qlx", json_mknumber(qlx));
-		json_append_member(data, "qhs", json_mknumber(qhs));
-		json_append_member(data, "qhl", json_mknumber(qhl));
-		//json_append_member(data, "tac", json_mknumber(tac));
-		//json_append_member(data, "cmos16", json_mknumber(cmos16));
-		//json_append_member(data, "cgt16", json_mknumber(cgt16));
-		//json_append_member(data, "cgt24", json_mknumber(cgt24));
-		//json_append_member(data, "missed", json_mknumber(missed));
-		//json_append_member(data, "lgi", json_mknumber(lgi));
-		//json_append_member(data, "nc_cc", json_mknumber(nc_cc));
-		//json_append_member(data, "crate", json_mknumber(crate));
-		//json_append_member(data, "board", json_mknumber(board));
-		
-		// add data to buffer
-		//char *datastr = json_encode(data);
-		//ringbuf_push((xl3_buf), ((void *)datastr), (strlen(datastr)+1));
-		//json_delete(data);
-		//free(datastr);
+		data = (pmt_upls *)calloc(1, sizeof(pmt_upls));
+		data->qlx = (uint32_t) UNPK_QLX((uint32_t *)&bndl_array[i]);
+		data->qhs = (uint32_t) UNPK_QHS((uint32_t *)&bndl_array[i]);
+		data->qhl = (uint32_t) UNPK_QHL((uint32_t *)&bndl_array[i]);
+		data->crate = (uint32_t) UNPK_CRATE_ID((uint32_t *)&bndl_array[i]);
+		data->board = (uint32_t) UNPK_BOARD_ID((uint32_t *)&bndl_array[i]);
+		data->chan = (uint32_t) UNPK_CHANNEL_ID((uint32_t *)&bndl_array[i]);
+		data->pmt = 512*(data->crate)+32*(data->board)+(data->chan);
 		ringbuf_push(xl3_buf, data, 0); // TODO: fix push size
 	}
 	free(data_pkt);
 
 	// If the buffer is full, spawn a new thread to upload it
 	if(ringbuf_isfull(xl3_buf)){
-		printf("RING_BUFFER_OVERFLOW_BUFFER_OVERFLOW\n");
-		printf("RING_BUFFER_OVERFLOW_BUFFER_OVERFLOW\n");
-		printf("RING_BUFFER_OVERFLOW_BUFFER_OVERFLOW\n");
-		printf("RING_BUFFER_OVERFLOW_BUFFER_OVERFLOW\n");
-		/*
-		int rc = 0;
-		pthread_t thread;
-		Ringbuf *tmpbuf = ringbuf_copy(xl3_buf);
-		rc = pthread_create(&thread, NULL, upload_buffer, tmpbuf);
-		if (rc) {
-			fprintf(stderr, "ERROR: return code from pthread_create() is %d\n", rc);
-		}
-		*/
+		fprintf(stderr, "RING_BUFFER_OVERFLOW_BUFFER_OVERFLOW\n");
+		event_base_loopexit(base, NULL);
 	}
 }
 

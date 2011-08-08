@@ -26,6 +26,18 @@ typedef struct {
     int valid;
     size_t pktsize;
 } connection;
+typedef struct {
+//{ crate=..., board=..., chan=..., qlx=..., qhl=..., qhs=... } //pmt0000
+	uint32_t crate;
+	uint32_t board;
+	uint32_t chan;
+	uint32_t pmt;// = crate*512+board*32+chan
+	uint32_t qlx;
+	uint32_t qhl;
+	uint32_t qhs;
+	int count;
+} pmt_upls;
+	
 // Gets the size of a con_type.
 // (pkt_size_of[EV_BUILDER]);
 size_t pkt_size_of[] =
