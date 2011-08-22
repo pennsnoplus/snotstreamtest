@@ -1,6 +1,7 @@
 *.[oa]
 *.swp
 monitor
+snotstream
 fakedata
 echo
 test
