@@ -12,22 +12,24 @@ typedef struct _SockInfo {
 } SockInfo;
 
 /* Update the event timer after curl_multi library calls */
-static int multi_timer_cb(CURLM *multi, long timeout_ms, GlobalInfo *g){
-  struct timeval timeout;
-  timeout.tv_sec = timeout_ms/1000;
-  timeout.tv_usec = (timeout_ms%1000)*1000;
-  fprintf(MSG_OUT, "multi_timer_cb: Setting timeout to %ld ms\n", timeout_ms);
-  evtimer_del(&g->timer_event);
-  evtimer_add(&g->timer_event, &timeout);
-  return 0;
+static int multi_timer_cb(CURLM *multi, long timeout_ms, void *data){
+	struct timeval timeout;
+	timeout.tv_sec = timeout_ms/1000;
+	timeout.tv_usec = (timeout_ms%1000)*1000;
+	fprintf(MSG_OUT, "multi_timer_cb: Setting timeout to %ld ms\n", timeout_ms);
+	if (evtimer_pending(&timer_event, NULL)){
+		evtimer_del(timer_event);
+	}
+	evtimer_add(timer_event, &timeout);
+	return 0;
 }
 
 /* Used to debug return codes from curl_multi_socket_action */
 static void debug_mcode(const char *desc, CURLMcode code){
-	if (code != CURLM_OK){
+	if ((code != CURLM_OK) || (code != CURLM_CALL_MULTI_PERFORM)){
 		const char *s;
 		switch (code) {
-			case CURLM_CALL_MULTI_PERFORM:	s="CURLM_CALL_MULTI_PERFORM";break;
+			//case CURLM_CALL_MULTI_PERFORM:	s="CURLM_CALL_MULTI_PERFORM";break; //ignore
 			case CURLM_BAD_HANDLE:			s="CURLM_BAD_HANDLE";break;
 			case CURLM_BAD_EASY_HANDLE:		s="CURLM_BAD_EASY_HANDLE";break;
 			case CURLM_OUT_OF_MEMORY:		s="CURLM_OUT_OF_MEMORY";break;
@@ -55,7 +57,7 @@ static void check_multi_info(){
 			// unpack the message
 			easy = msg->easy_handle;
 			res = msg->data.result;
-			curl_easy_getinfo(easy, CURLINFO_PRIVATE< &conn);
+			curl_easy_getinfo(easy, CURLINFO_PRIVATE, &conn);
 			// get rid of the easy handle
 			curl_multi_remove_handle(multi, easy);
 			curl_easy_cleanup(easy);
@@ -88,11 +90,11 @@ static void setsock(SockInfo *fdp, curl_socket_t s, int action){
 watching for events on different sockets. */
 static int sock_cb(CURL *e, curl_socket_t s, int action, void *cbp, void *sockp){
 	/*
-	e       = easy handle that the callback happened on,
-	s       = actual socket that is involved,
-	action  = what to check for / do (?) (nothing, IN, OUT, INOUT, REMOVE)
-	cbp     = private callback pointer (from where? ignored!)
-	socketp = private data set with setop(CURLOPT_PRIVATE) // TODO: set this in POUCH
+	e		= easy handle that the callback happened on,
+	s		= actual socket that is involved,
+	action	= what to check for / do (?) (nothing, IN, OUT, INOUT, REMOVE)
+	cbp		= private callback pointer (from where? ignored!)
+	socketp	= private data set by curl_multi_assign, NOT with easy_setopt(CURLOPT_PRIVATE)
 	*/
 	SockInfo *fdp = (SockInfo *)sockp;
 	if (action == CURL_POLL_REMOVE){
@@ -109,6 +111,7 @@ static int sock_cb(CURL *e, curl_socket_t s, int action, void *cbp, void *sockp)
 			// start watching this socket for events
 			SockInfo *fdp = calloc(1, sizeof(SockInfo));
 			setsock(fdp, s, action);
+			curl_multi_assign(multi, s, fdp);
 		}
 		else {
 			// reset the sock with the new type of action
@@ -177,5 +180,5 @@ static void new_conn(char *url){
 	rc = curl_multi_add_handle(multi, conn->easy);
 	debug_mcode("new_conn: curl_multi_add_handle", rc);
 	/* curl_multi_add_handle() will set a time-out to trigger very soon so
-	   that the necessary socket_action() call will be called by this app */
+		 that the necessary socket_action() call will be called by this app */
 }
