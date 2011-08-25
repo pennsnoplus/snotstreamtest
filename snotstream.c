@@ -21,13 +21,9 @@
 #include "snotstream.h"
 #include "pkt_utils.h"
 #include "lib/json/json.h"
-#include "lib/pouch/pouch.h"
 #include "lib/ringbuf/ringbuf.h"
+#include "lib/pouch/pouch.h"
 
-// Defines
-#define MAX_MON_CONS 10
-#define SERVER "snoplus:snoplustest@snoplus.cloudant.com"
-#define DATABASE "pmt_test2"
 
 // Globals
 int have_controller = 0;
@@ -56,10 +52,10 @@ size_t pkt_size_of[] = {
 struct event *mk_rectimer(struct event_base *base, struct timeval *interval, void (*user_cb)(evutil_socket_t, short, void *), void *user_data){
 	/* Creates a recurring timer event. */
 	struct event *ev;
-	if(!(ev = event_new(base, -1, EV_TIMEOUT|EV_PERSIST, *user_cb, user_data))){
+	if(!(ev = event_new(base, -1, EV_TIMEOUT|EV_PERSIST, user_cb, user_data))){
 		return NULL;
 	}
-	if(!(event_add(ev, interval))){
+	if(event_add(ev, interval) < 0){
 		event_free(ev);
 		return NULL;
 	}
@@ -346,7 +342,7 @@ void upload_xl3(Ringbuf *rbuf, CURLM *multi){
 
 	char *datastr = json_encode(doc);
 	pr = pr_init();
-	pr = pr_doc_create(pr, SERVER, DATABASE, datastr);
+	pr = doc_create(pr, SERVER, DATABASE, datastr);
 	free(datastr);
 	json_delete(doc);
 	pr_domulti(pr, multi);
@@ -563,21 +559,29 @@ int main(int argc, char **argv){
 
 	// Create a signal watcher for C-c (SIGINT)
 	struct event *signal_event;
-	signal_event = evsignal_new(base, SIGINT, signal_cb, (void *)base);
+	signal_event = evsignal_new(pmi->base, SIGINT, signal_cb, (void *)(pmi->base));
 	if (!signal_event || event_add(signal_event, NULL) < 0) {
 		fprintf(stderr, "Could not create/add a signal event!\n");
 		return 6;
 	}
+	
+	// Initialize the XL3 ringbuffer
+	xl3_buf = ringbuf_init(&xl3_buf, 1000000); // some absurdly large size
 	
 	// Create the XL3 ringbuffer watcher
 	struct timeval xl3_delay; // set the delay to...
 	xl3_delay.tv_sec=0;
 	xl3_delay.tv_usec=500000; // ... 0.5 seconds
 
-	struct event *xl3_watcher = mk_rectimer(base, &xl3_delay, &xl3_watcher_cb, pmi);
-	if (!xl3_watcher){
+	// TODO: use mk_rectimer instead
+	struct event *xl3_watcher = event_new(pmi->base, -1, EV_TIMEOUT|EV_PERSIST, xl3_watcher_cb, pmi);
+	if(!xl3_watcher){
 		fprintf(stderr, "Unable to create a recurring timer to watch the xl3 ringbuffer.\n");
 		return 7;
+	}
+	if(event_add(xl3_watcher, &xl3_delay) < 0){
+		fprintf(stderr, "Could not set a timevalue for the xl3 ringbuffer watcher timer.\n");
+		return 8;
 	}
 
 	// Run the main loop

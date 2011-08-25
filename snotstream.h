@@ -1,6 +1,12 @@
+#ifndef SNOTSTREAM_H
+#define SNOTSTREAM_H
 #include "pkt_types.h"
-#include "lib/pouch/pouch.c"
-#include "lib/ringbuf/ringbuf.c"
+#include "lib/pouch/pouch.h"
+#include "lib/ringbuf/ringbuf.h"
+// Defines
+#define MAX_MON_CONS 10
+#define SERVER "snoplus:snoplustest@snoplus.cloudant.com"
+#define DATABASE "pmt_test2"
 
 // Structs, Typedefs
 typedef void(*com_ptr)(char *, void *); // command pointer
@@ -73,3 +79,4 @@ void listener_error_cb(struct evconnlistener *listener, void *ctx);
 
 // Pouch Callbacks
 void pr_callback(PouchReq *pr, PouchMInfo *pmi);
+#endif
