@@ -1,3 +1,6 @@
+#ifndef __RINGBUF_H
+#define __RINGBUF_H
+
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -26,3 +29,4 @@ int ringbuf_push(Ringbuf *rb, void *key, size_t size);
 int ringbuf_pop(Ringbuf *rb, void **dest);
 int ringbuf_insert(Ringbuf *rb, int elem, void *key, int overwrite);
 int ringbuf_get(Ringbuf *rb, int elem, void **dest);
+#endif

@@ -26,6 +26,17 @@
 int bundle_counter = 0;
 
 // Helper Functions
+struct event *recurring_timer(struct event_base *base, struct timeval *interval, void (*user_cb)(evutil_socket_t, short, void *), void *user_data){
+	struct event *ev;
+	if(!(ev=event_new(base, -1, EV_PERSIST, *user_cb, user_data)))
+		return NULL;
+	if(!(event_add(ev, interval))){
+		event_free(ev);
+		return NULL;
+	}
+	return ev;
+}
+
 void delete_con(connection * con) {
 	if (con->host)
 		free(con->host);
@@ -403,16 +414,6 @@ void signal_cb(evutil_socket_t sig, short events, void *user_data) {
 	struct event_base *base = user_data;
 	printf("Caught an interrupt signal; exiting.\n");
 	event_base_loopbreak(base);
-}
-struct event *recurring_timer(struct event_base *base, struct timeval *interval, void (*user_cb)(evutil_socket_t, short, void *), void *user_data){
-	struct event *ev;
-	if(!(ev=event_new(base, -1, EV_PERSIST, user_cb, user_data)))
-		return NULL;
-	if(!(event_add(ev, interval))){
-		event_free(ev);
-		return NULL;
-	}
-	return ev;
 }
 
 int main(int argc, char **argv) {

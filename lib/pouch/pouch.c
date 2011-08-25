@@ -286,8 +286,6 @@ void debug_mcode(const char *desc, CURLMcode code){
 	}
 }
 void check_multi_info(PouchMInfo *pmi /*, function pointer process_func*/){
-	// TODO: implement a callback here to handle completed functions
-	// NOTE: keep it in PouchMInfo? this function already takes that
 	CURLMsg *msg;
 	CURL *easy;
 	CURLcode res;
@@ -301,13 +299,14 @@ void check_multi_info(PouchMInfo *pmi /*, function pointer process_func*/){
 			easy = msg->easy_handle;
 			res = msg->data.result;
 			curl_easy_getinfo(easy, CURLINFO_PRIVATE, &pr);
-			printf("Finished request (easy=%p, url=%s)\n", easy, pr->url);
-			printf("Response: %s\n", pr->resp.data);
+			//printf("Finished request (easy=%p, url=%s)\n", easy, pr->url);
 			// process the result
-			//pmi->process_func(pr);
-			// TODO: move this to process function?
-			// clean up the pouch request and associated CURL handle
-			pr_free(pr);
+			if(pmi->has_cb){
+				pmi->cb(pr, pmi);
+			}
+			else {
+				pr_free(pr);
+			}
 		}
 	}
 }
@@ -320,7 +319,7 @@ int multi_timer_cb(CURLM *multi, long timeout_ms, void *data){
 	struct timeval timeout;
 	timeout.tv_sec = timeout_ms/1000;
 	timeout.tv_usec = (timeout_ms%1000)*1000;
-	fprintf(stderr, "multi_timer_cb: Setting timeout to %ld ms\n", timeout_ms);
+	//fprintf(stderr, "multi_timer_cb: Setting timeout to %ld ms\n", timeout_ms);
 	if (evtimer_pending(&pmi->timer_event, NULL)){
 		evtimer_del(&pmi->timer_event);
 	}
@@ -328,7 +327,6 @@ int multi_timer_cb(CURLM *multi, long timeout_ms, void *data){
 	return 0;
 }
 void event_cb(int fd, short kind, void *userp){
-	printf("event!\n");
 	/*
 		Called by libevent when there is any type
 		of action on a socket being watched.
@@ -417,7 +415,7 @@ int sock_cb(CURL *e, curl_socket_t s, int action, void *cbp, void *sockp){
 	}
 	return 0;
 }
-PouchMInfo *pouch_multi_init(PouchMInfo *pmi, struct event_base *base){
+PouchMInfo *pr_mk_pmi(struct event_base *base, struct evdns_base *dns_base, pr_proc_cb callback, void *custom){
 	/*
 		Initialize a PouchMInfo structure for use with libevent.
 		This creates and initializes the CURLM handle pointer,
@@ -426,8 +424,20 @@ PouchMInfo *pouch_multi_init(PouchMInfo *pmi, struct event_base *base){
 		libevent event_base for use as a sort of "global" base throughout
 		all of the callbacks, so that the user can define their own base.
 	*/
+	PouchMInfo *pmi = (PouchMInfo *)malloc(sizeof(PouchMInfo));
+	if(!pmi){
+		return NULL;
+	}
+	memset(pmi, 0, sizeof(*pmi));
 	pmi->base = base;
+	pmi->dnsbase = dns_base;
 	pmi->still_running = 0;
+	pmi->has_cb = 0;
+	if (callback){
+		pmi->cb = callback; // set the callback function
+		pmi->has_cb = 1;
+	}
+	pmi->custom = custom;
 	pmi->multi = curl_multi_init();
 	evtimer_set(&pmi->timer_event, timer_cb, (void *)pmi);
 	event_base_set(pmi->base, &pmi->timer_event);
@@ -438,18 +448,25 @@ PouchMInfo *pouch_multi_init(PouchMInfo *pmi, struct event_base *base){
 	curl_multi_setopt(pmi->multi, CURLMOPT_TIMERDATA, pmi);
 	return pmi;
 }
-void *pouch_multi_delete(PouchMInfo *pmi){
+void pr_del_pmi(PouchMInfo *pmi){
 	/*
 		Cleans up and deletes a PouchMInfo struct.
 		It gets rid of the timer event, frees the event base
-		(don't do this manuallya fter calling pouch_multi_delete!)
+		(don't do this manually after calling pr_del_pmi!)
 		and cleans up the CURLM handle. Afterwards, it frees
 		the object. Don't try to free it again.
 	*/
-	event_del(&pmi->timer_event);
-	event_base_free(pmi->base);
-	curl_multi_cleanup(pmi->multi);
-	free(pmi);
+	if(pmi){
+		event_del(&pmi->timer_event); // TODO: figure out how to check if this is valid
+		if(pmi->base){
+			event_base_free(pmi->base);
+		} if(pmi->dnsbase){
+			evdns_base_free(pmi->dnsbase, 0);
+		} if(pmi->multi){
+			curl_multi_cleanup(pmi->multi);
+		}
+		free(pmi);
+	}
 }
 
 PouchReq *pr_domulti(PouchReq *pr, CURLM *multi){
@@ -510,7 +527,7 @@ PouchReq *pr_domulti(PouchReq *pr, CURLM *multi){
 
 	// start the request by adding it to the multi handle
 	pr->curlmcode = curl_multi_add_handle(pr->multi, pr->easy);
-	printf("pr->curlmcode = %d\n", pr->curlmcode);
+	//printf("pr->curlmcode = %d\n", pr->curlmcode);
 	debug_mcode("pr_domulti: ", pr->curlmcode);
 	
 	return pr;

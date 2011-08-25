@@ -30,19 +30,17 @@
 #define DELETE "DELETE"
 
 // Structs
-typedef struct _PouchMInfo {
-	/*
-		Used in the multi interface only.
-		Holds values necessary for using
-		libevent with libcurl; used for
-		the multi interface.
-	*/
-	CURLM *multi;
-	struct event timer_event;
-	struct event_base *base;
-	int still_running;
-} PouchMInfo;
-typedef struct _SockInfo {
+typedef struct _SockInfo SockInfo;
+typedef struct _PouchPkt PouchPkt;
+typedef struct _PouchReq PouchReq;
+typedef struct _PouchMInfo PouchMInfo;
+/*
+	If a pr_proc_cb is set by the user, that function
+	becomes responsible for pr_free()'ing the received
+	PouchReq.
+*/
+typedef void (*pr_proc_cb)(PouchReq *, PouchMInfo *); // callback function for processing finished PouchReqs
+struct _SockInfo {
 	/*
 		Used in the multi interface only.
 		Holds information on a socket used
@@ -53,8 +51,8 @@ typedef struct _SockInfo {
 	struct event ev;		// event on the socket
 	int ev_is_set;			// whether or not ev is set and being monitored
 	int action;				// what action libcurl wants done
-} SockInfo;
-typedef struct _PouchPkt {
+};
+struct _PouchPkt {
 	/*
 	   Holds data to be sent to
 	   or received from a CouchDB
@@ -63,8 +61,8 @@ typedef struct _PouchPkt {
 	char *data;
 	char *offset;
 	size_t size;
-} PouchPkt;
-typedef struct _PouchReq {
+};
+struct _PouchReq {
 	/*
 	   A structure to be used
 	   to send a request to 
@@ -84,7 +82,26 @@ typedef struct _PouchReq {
 	long httpresponse;	// holds the http response of a request
 	PouchPkt req;		// holds data to be sent
 	PouchPkt resp;		// holds response
-} PouchReq;
+};
+struct _PouchMInfo {
+	/*
+		Used in the multi interface only.
+		Holds values necessary for using
+		libevent with libcurl; used for
+		the multi interface. This is the
+		struct that gets passed around
+		to all of the libevent and libcurl
+		callback functions.
+	*/
+	CURLM *multi;
+	struct event timer_event;	// event necessary for libevent to work with libcurl
+	struct event_base *base;	// libevent event_base for creating events
+	struct evdns_base *dnsbase ;// libevent dns_base for creating connections
+	int still_running;			// whether or not there are any running libcurl handles
+	pr_proc_cb cb;		// USER DEFINED pointer to a callback function for processing finished PouchReqs
+	int has_cb;			// ... tests for existence of callback function
+	void *custom;				// USER DEFINED pointer to some data. 
+};
 
 
 // Miscellaneous helper functions
@@ -116,8 +133,8 @@ void event_cb(int fd, short kind, void *userp);
 void timer_cb(int fd, short kind, void *userp);
 void setsock(SockInfo *fdp, curl_socket_t s, int action, PouchMInfo *pmi);
 int sock_cb(CURL *e, curl_socket_t s, int action, void *cbp, void *sockp);
-PouchMInfo *pouch_multi_init(PouchMInfo *pmi, struct event_base *base);
-void *pouch_multi_delete(PouchMInfo *pmi);
+PouchMInfo *pr_mk_pmi(struct event_base *base, struct evdns_base *dns_base, pr_proc_cb callback, void *custom);
+void pr_del_pmi(PouchMInfo *pmi);
 
 PouchReq *pr_domulti(PouchReq *pr, CURLM *multi);
 #endif
