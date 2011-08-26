@@ -273,7 +273,7 @@ void parse_xl3(void *data_pkt){
 	PMTBundle *bndl_array = (PMTBundle *)(xpkt->payload);
 	
 	int i;
-	pmt_upls *data; // control is handed over to xl3_buf
+	pmt_upls *data;
 	for(i = 0; i < cmhdr.num_bundles; i++){
 		data = (pmt_upls *)calloc(1, sizeof(pmt_upls));
 		data->qlx = (uint32_t) UNPK_QLX((uint32_t *)&bndl_array[i]);
@@ -310,10 +310,6 @@ void upload_xl3(Ringbuf *rbuf, CURLM *multi){
 		pmts[pmt].qhl = pmts[pmt].qhl + data->qhl;
 		pmts[pmt].qlx = pmts[pmt].qlx + data->qlx;
 		pmts[pmt].count++;
-		if (data){
-			//printf("DATA EXISTED\n");
-			free(data);
-		}
 	}
 	
 	// Holds the JSON to be uploaded
@@ -346,8 +342,8 @@ void upload_xl3(Ringbuf *rbuf, CURLM *multi){
 
 	char *datastr = json_encode(doc);
 	pr = pr_init();
-	pr = doc_prcreate(pr, SERVER, DATABASE, datastr);
-	//free(datastr); // this was copied to pr
+	pr = doc_create(pr, SERVER, DATABASE, datastr);
+	free(datastr);
 	json_delete(doc);
 	pr_domulti(pr, multi);
 }
@@ -366,15 +362,12 @@ static void xl3_watcher_cb(evutil_socket_t fd, short events, void *ctx){
 	*/
 	if(!ringbuf_isempty(xl3_buf)){
 		// TODO: could this be faster?
-		// TODO: if we have control, no need to reallocate?
-		//Ringbuf *tmpbuf = ringbuf_copy(xl3_buf); // so that writes can keep happening while we read
-		//ringbuf_clear(xl3_buf); // empty it!
+		Ringbuf *tmpbuf = ringbuf_copy(xl3_buf); // so that writes can keep happening while we read
 
 		PouchMInfo *pmi = (PouchMInfo *)ctx;
-		//upload_xl3(tmpbuf, pmi->multi);	// upload the xl3 data
-		upload_xl3(xl3_buf, pmi->multi);
-		//ringbuf_clear(tmpbuf);
-		//free(tmpbuf);
+		upload_xl3(tmpbuf, pmi->multi);	// upload the xl3 data
+		ringbuf_clear(tmpbuf);
+		free(tmpbuf);
 	}
 }
 
@@ -494,9 +487,7 @@ void pr_callback(PouchReq *pr, PouchMInfo *pmi){
 		PouchReq(uests). Right now, it just notifies
 		the user that a request was completed.
 	*/
-	printf("%s request to %s:\n", pr->method, pr->url);
-	//printf("sent: %s\n", pr->req.data);
-	printf("rcvd: %s\n", pr->resp.data);
+	printf("%s request to %s returned %s\n", pr->method, pr->url, pr->resp.data);
 	pr_free(pr);
 }
 
@@ -602,9 +593,6 @@ int main(int argc, char **argv){
 	event_del(xl3_watcher);
 
 	pr_del_pmi(pmi); // frees 'base' and 'dnsbase', too
-
-	ringbuf_clear(xl3_buf);
-	free(xl3_buf);
 	
 	// Exit
 	return 0;
