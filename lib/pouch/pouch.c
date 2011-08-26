@@ -172,6 +172,15 @@ PouchReq *pr_set_data(PouchReq *pr, char *str){
 	pr->req.size = length; // do not send the last '\0' - JSON is not null terminated
 	return pr;
 }
+PouchReq *pr_set_prdata(PouchReq *pr, char *str, size_t len){
+	if(pr->req.data){
+		free(pr->req.data);
+	}
+	pr->req.data = str;
+	pr->req.offset = pr->req.data;
+	pr->req.size = len;
+	return pr;
+}
 PouchReq *pr_set_bdata(PouchReq *pr, void *dat, size_t length){
 	if (pr->req.data){
 		free(pr->req.data);
@@ -214,9 +223,9 @@ PouchReq *pr_do(PouchReq * pr){
 		// setup the CURL object/request
 		curl_easy_setopt(curl, CURLOPT_USERAGENT, "pouch/0.1");	// add user-agent
 		curl_easy_setopt(curl, CURLOPT_URL, pr->url);	// where to send this request
-		curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 2);	// Timeouts
-		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2);
-		curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
+		curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 2);	// maximum amount of time to create connection
+		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60);	// maximum amount of time to send data = 1 minute
+		curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1); // TODO: why? multithreading?
 		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, recv_data_callback);	// where to store the response
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)pr);
 		if (pr->usrpwd){	// if there's a valid auth string, use it
@@ -549,6 +558,14 @@ PouchReq *doc_create(PouchReq * pr, char *server, char *db,char *data){
 	pr_set_url(pr, server);
 	pr->url = combine(&(pr->url), pr->url, db, "/");
 	pr_set_data(pr, data);
+
+	return pr;
+}
+PouchReq *doc_prcreate(PouchReq *pr, char *server, char *db, char *data){
+	pr_set_method(pr, POST);
+	pr_set_url(pr, server);
+	pr->url = combine(&(pr->url), pr->url, db, "/");
+	pr_set_prdata(pr, data, strlen(data));
 	return pr;
 }
 PouchReq *get_all_docs(PouchReq * pr, char *server, char *db){
