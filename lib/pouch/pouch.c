@@ -295,6 +295,11 @@ PouchReq *pr_domulti(PouchReq *pr, CURLM *multi){
 	pr->resp.size = 0;
 
 	// initialize the CURL object
+	if (pr->easy){ // get rid of the old one?
+		printf("EXISTING EASY\n");
+		curl_multi_remove_handle(multi, pr->easy);
+		curl_easy_cleanup(pr->easy);
+	}
 	pr->easy = curl_easy_init();
 	pr->multi = multi;
 	
@@ -377,10 +382,13 @@ void pr_free(PouchReq *pr){
 	   leaks secret documents.
 	 */
 	if (pr->easy){	// free request and remove it from multi
+		int ret;
 		if (pr->multi){
-			curl_multi_remove_handle(pr->multi, pr->easy);
+			ret = curl_multi_remove_handle(pr->multi, pr->easy);
+			printf("(%d) remd easy %p from multi %p\n", ret, pr->easy, pr->multi);
 		}
 		curl_easy_cleanup(pr->easy);
+		printf("(?) clnd easy %p\n", pr->easy);
 	}
 	if (pr->resp.data){			// free response data
 		free(pr->resp.data);
@@ -792,6 +800,9 @@ void debug_mcode(const char *desc, CURLMcode code){
 		fprintf(stderr, "ERROR: %s returns %s\n", desc, s);
 	}
 }
+
+		
+	
 void check_multi_info(PouchMInfo *pmi /*, function pointer process_func*/){
 	CURLMsg *msg;
 	CURL *easy;
@@ -953,7 +964,55 @@ PouchMInfo *pr_mk_pmi(struct event_base *base, struct evdns_base *dns_base, pr_p
 	curl_multi_setopt(pmi->multi, CURLMOPT_SOCKETDATA, pmi);
 	curl_multi_setopt(pmi->multi, CURLMOPT_TIMERFUNCTION, multi_timer_cb);
 	curl_multi_setopt(pmi->multi, CURLMOPT_TIMERDATA, pmi);
+	//curl_multi_setopt(pmi->multi, CURLMOPT_MAXCONNECTS, 20); // arbitrary
 	return pmi;
+}
+/*
+void pmi_multi_cleanup(CURLM *multi){
+	printf("inside pmi_multi_cleanup\n");
+	printf("multi = %p\n", multi);
+	CURLMsg *msg;
+	CURL *easy;
+	PouchReq *pr;
+
+	// messages left <- num_easies
+	int messages_left;
+	while ((msg = curl_multi_info_read(multi, &messages_left))){
+		easy = msg->easy_handle;
+		printf("got easy = %p\n", easy);
+		curl_easy_getinfo(easy, CURLINFO_PRIVATE, &pr);
+		printf("pr  easy = %p\n", easy);
+		pr_free(pr);
+	}
+}
+*/
+void pmi_multi_cleanup(PouchMInfo *pmi){
+	printf("INSIDE pmi_multi_cleanup with pmi = %p\n", pmi);
+	CURLMsg *msg;
+	CURL *easy;
+	CURLcode res;
+	
+	int msgs_left;
+	PouchReq *pr;
+	fprintf(stderr, "remaining easy_handles: %d\n", pmi->still_running);
+	while ((msg = curl_multi_info_read(pmi->multi, &msgs_left))){
+		printf("msgs_left = %d\n", msgs_left);
+		printf("woo unpacked a message\n");
+		if(msg){ // if this action is done
+			printf("woo message existed\n");
+			// unpack the message
+			easy = msg->easy_handle;
+			res = msg->data.result;
+			curl_easy_getinfo(easy, CURLINFO_PRIVATE, &pr);
+			pr_free(pr);
+			printf("FREED !\n");
+		}
+		else {
+			printf("boo message did NOT exist\n");
+		}
+	}
+	//printf("msg->data.result = %d\n", msg->data.result);
+	printf("msgs_left = %d\n", msgs_left);
 }
 void pr_del_pmi(PouchMInfo *pmi){
 	/*
@@ -964,13 +1023,17 @@ void pr_del_pmi(PouchMInfo *pmi){
 		the object. Don't try to free it again.
 	*/
 	if(pmi){
+		printf("pmi %p exists!\n", pmi);
 		event_del(&pmi->timer_event); // TODO: figure out how to check if this is valid
+		if(pmi->multi){
+			printf("pmi %p multi %p exists!\n", pmi, pmi->multi);
+			//pmi_multi_cleanup(pmi);
+			curl_multi_cleanup(pmi->multi);
+		}
 		if(pmi->dnsbase){
 			evdns_base_free(pmi->dnsbase, 0);
 		} if (pmi->base){
 			event_base_free(pmi->base);
-		} if(pmi->multi){
-			curl_multi_cleanup(pmi->multi);
 		}
 		free(pmi);
 	}

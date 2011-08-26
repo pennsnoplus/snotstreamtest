@@ -342,19 +342,23 @@ void upload_xl3(Ringbuf *rbuf, CURLM *multi){
 	json_append_member(doc, "pmts", pmt_array);
 
 	char *datastr = json_encode(doc);
-	pr = pr_init();
-	pr = doc_create(pr, SERVER, DATABASE, datastr);
-	free(datastr);
 	json_delete(doc);
+	pr = pr_init();
+	//pr = doc_create(pr, SERVER, DATABASE, datastr);
+	pr = doc_prcreate(pr, SERVER, DATABASE, datastr);
+	//free(datastr);
 	pr_domulti(pr, multi);
 }
 
 // Libevent Callbacks
 void signal_cb(evutil_socket_t sig, short events, void *user_data) {
 	/* Catches C-c and exits cleanly by stopping the event loop. */
-	struct event_base *base = user_data;
+	//struct event_base *base = user_data;
+	PouchMInfo *pmi = (PouchMInfo *)user_data;
 	printf("Caught an interrupt signal; exiting.\n");
-	event_base_loopbreak(base);
+	pmi_multi_cleanup(pmi);
+	//event_base_loopbreak(base);
+	event_base_loopbreak(pmi->base);
 }
 
 static void xl3_watcher_cb(evutil_socket_t fd, short events, void *ctx){
@@ -560,7 +564,8 @@ int main(int argc, char **argv){
 
 	// Create a signal watcher for C-c (SIGINT)
 	struct event *signal_event;
-	signal_event = evsignal_new(pmi->base, SIGINT, signal_cb, (void *)(pmi->base));
+	//signal_event = evsignal_new(pmi->base, SIGINT, signal_cb, (void *)(pmi->base));
+	signal_event = evsignal_new(pmi->base, SIGINT, signal_cb, (void *)pmi);
 	if (!signal_event || event_add(signal_event, NULL) < 0) {
 		fprintf(stderr, "Could not create/add a signal event!\n");
 		return 6;
@@ -587,6 +592,7 @@ int main(int argc, char **argv){
 
 	// Run the main loop
 	event_base_dispatch(pmi->base);
+	printf("event base finished.\n");
 	
 	// Clean up
 	event_del(signal_event);
@@ -594,7 +600,7 @@ int main(int argc, char **argv){
 	event_del(xl3_watcher);
 	free(xl3_watcher);
 	evconnlistener_free(listener);
-
+	printf("about to delete pmi %p\n", pmi);
 	pr_del_pmi(pmi); // frees 'base' and 'dnsbase', too
 	
 	// Exit

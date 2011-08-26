@@ -162,6 +162,7 @@ void timer_cb(int fd, short kind, void *userp);
 void setsock(SockInfo *fdp, curl_socket_t s, int action, PouchMInfo *pmi);
 int sock_cb(CURL *e, curl_socket_t s, int action, void *cbp, void *sockp);
 PouchMInfo *pr_mk_pmi(struct event_base *base, struct evdns_base *dns_base, pr_proc_cb callback, void *custom);
+void pmi_multi_cleanup(PouchMInfo *pmi);
 void pr_del_pmi(PouchMInfo *pmi);
 
 #endif
