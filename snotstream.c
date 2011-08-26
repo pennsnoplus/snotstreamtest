@@ -310,6 +310,7 @@ void upload_xl3(Ringbuf *rbuf, CURLM *multi){
 		pmts[pmt].qhl = pmts[pmt].qhl + data->qhl;
 		pmts[pmt].qlx = pmts[pmt].qlx + data->qlx;
 		pmts[pmt].count++;
+		free(data);
 	}
 	
 	// Holds the JSON to be uploaded
@@ -591,6 +592,8 @@ int main(int argc, char **argv){
 	event_del(signal_event);
 	free(signal_event);
 	event_del(xl3_watcher);
+	free(xl3_watcher);
+	evconnlistener_free(listener);
 
 	pr_del_pmi(pmi); // frees 'base' and 'dnsbase', too
 	
