@@ -318,7 +318,7 @@ void upload_xl3(Ringbuf *rbuf, CURLM *multi){
 	
 	struct timeval tv; // timestamp
 	gettimeofday(&tv,0);
-	double timestamp = ((double)tv.tv_sec) + ((double)tv.tv_usec)/1000000;
+	double timestamp = ((double)tv.tv_sec)*1000000 + ((double)tv.tv_usec); // JS Date() compatible
 	json_append_member(doc, "ts", json_mknumber(timestamp));
 
 	int i;
