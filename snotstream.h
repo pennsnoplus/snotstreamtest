@@ -1,7 +1,7 @@
 #ifndef SNOTSTREAM_H
 #define SNOTSTREAM_H
 #include "pkt_types.h"
-#include "lib/pouch/pouch.h"
+#include "lib/pouch/multi_pouch.h"
 #include "lib/ringbuf/ringbuf.h"
 // Defines
 #define MAX_MON_CONS 10

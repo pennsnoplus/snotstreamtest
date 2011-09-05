@@ -22,7 +22,7 @@
 #include "pkt_utils.h"
 #include "lib/json/json.h"
 #include "lib/ringbuf/ringbuf.h"
-#include "lib/pouch/pouch.h"
+#include "lib/pouch/multi_pouch.h"
 
 
 // Globals

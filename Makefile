@@ -5,4 +5,4 @@ clean:
 fakedata:
 	gcc -o fakedata fakedata.c -levent -L/usr/local/lib -g
 snotstream: clean
-	gcc -o snotstream lib/ringbuf/ringbuf.c snotstream.c lib/pouch/pouch.c lib/json/json.c -lcurl -levent -L/usr/local/lib -g
+	gcc -o snotstream lib/ringbuf/ringbuf.c snotstream.c lib/pouch/pouch.c lib/pouch/multi_pouch.c lib/json/json.c -lcurl -levent -L/usr/local/lib -g
