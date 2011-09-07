@@ -13,20 +13,22 @@ typedef struct {
 	uint64_t fill;		// fillcount (+writemoves -readmoves);
 } Ringbuf;
 
-// allocate and init
-Ringbuf *ringbuf_init(Ringbuf **rb, int num_keys);
-// clear
+Ringbuf *ringbuf_init(Ringbuf **rb, uint64_t num_keys);
 void ringbuf_clear(Ringbuf *rb);
-// "copy" (move)
+
 Ringbuf *ringbuf_copy(Ringbuf *rb);
-// debugging
+Ringbuf *ringbuf_dup(Ringbuf *rb);
+
 void ringbuf_status(Ringbuf *rb, char *pref);
-// state
+
 int ringbuf_isfull(Ringbuf *rb);
 int ringbuf_isempty(Ringbuf *rb);
-// add / remove
-int ringbuf_push(Ringbuf *rb, void *key, size_t size);
+
+int ringbuf_push(Ringbuf *rb, void *memaddr);
+int ringbuf_pushcp(Ringbuf *rb, void *memaddr, size_t size);
+
 int ringbuf_pop(Ringbuf *rb, void **dest);
-int ringbuf_insert(Ringbuf *rb, int elem, void *key, int overwrite);
 int ringbuf_get(Ringbuf *rb, int elem, void **dest);
+
+int ringbuf_insert(Ringbuf *rb, int elem, void *key, int overwrite);
 #endif

@@ -284,7 +284,7 @@ void parse_xl3(void *data_pkt){
 		data->chan = (uint32_t) UNPK_CHANNEL_ID((uint32_t *)&bndl_array[i]);
 		data->pmt = 512*(data->crate)+32*(data->board)+(data->chan);
 		if(!ringbuf_isfull(xl3_buf)){
-			ringbuf_push(xl3_buf, data, 0); // TODO: fix push size
+			ringbuf_push(xl3_buf, data);
 		}
 		else { // If the buffer is full, we've fallen behind.
 			fprintf(stderr, "parse_xl3: ran out of room!\
