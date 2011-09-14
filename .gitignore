@@ -1,5 +1,6 @@
 *.[oa]
 *.swp
+*.dSYM
 monitor
 snotstream
 fakedata
