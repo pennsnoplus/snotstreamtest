@@ -145,7 +145,7 @@ int ringbuf_pop(Ringbuf *rb, void **dest){
 //   points to is freed and the key overwritten.
 int ringbuf_insert(Ringbuf *rb, int elem, void *key, int overwrite){
 	int loc = elem % rb->num_keys;
-	int full = ringbuf_isfull(rb);
+	//int full = ringbuf_isfull(rb); // Unused?
 	if(rb->keys[loc] != NULL){
 		if(overwrite){
 			rb->fill--;
