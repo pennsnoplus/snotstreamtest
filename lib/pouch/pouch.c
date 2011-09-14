@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <time.h>
+#include <unistd.h>
 
 // Libcurl
 #include <curl/curl.h>
@@ -598,7 +599,8 @@ PouchReq *doc_add_attachment(PouchReq * pr, char *server, char *db,char *doc, ch
 	// read file into buffer
 	size_t fd_len = file_info.st_size;
 	char fd_buf[fd_len];
-	int numbytes = read(fd, fd_buf, fd_len);
+	//int numbytes = read(fd, fd_buf, fd_len); // Unused?
+	read(fd, fd_buf, fd_len);
 	pr_set_bdata(pr, (void *)fd_buf, fd_len);
 	close(fd);
 	// just in case the actual mime-type is weird or broken, add a default

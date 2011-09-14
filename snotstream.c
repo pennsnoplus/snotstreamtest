@@ -23,13 +23,15 @@
 #include "lib/json/json.h"
 #include "lib/ringbuf/ringbuf.h"
 #include "lib/pouch/multi_pouch.h"
-
+#include "lib/node/node.h"
 
 // Globals
 int have_controller = 0;
+struct bufferevent *controller_bev = NULL;
 int cur_mon_con = 0;
 Ringbuf *xl3_buf;
 connection monitoring_cons[MAX_MON_CONS];
+
 command controller_coms[] = {
 	{"url_get", &url_get},
 	{"print_cons", &print_cons},
@@ -173,11 +175,25 @@ void url_get(char *url, void *data){
 	pr_set_url(pr, url);
 	pr_set_method(pr, GET);
 	pr = pr_domulti(pr, pmi->multi); // send a GET request to the url
+	Node *pr_carrier = nd_make(pr);
+	nd_append(nd_last(pmi->custom), pr_carrier);
 	//fprintf(stderr, "Added easy %p to multi %p (%s)\n", pr->easy, pmi->multi, pr->url);
 	debug_mcode("new_conn: curl_multi_add_handle", pr->curlmcode);
 	/* curl_multi_add_handle() will set a time-out to trigger very soon so
 	   that the necessary socket_action() call will be called by this app */
 }
+
+void stop_all_cons(){
+	int i;
+	connection *con;
+	for(i = 0; i < cur_mon_con; i++){
+		con = &monitoring_cons[i];
+		delete_con(con);
+		printf("Stopped monitoring %s %s:%d\n", get_con_typestr(con->type), con->host, con->port);
+	}
+	printf("cur_mon_con = %d\n", cur_mon_con);
+}
+
 void stop_con(char *inbuf, void *UNUSED) {
 	/*
 		Tries to stop a monitoring connection of
@@ -186,7 +202,7 @@ void stop_con(char *inbuf, void *UNUSED) {
 	char *type;
 	char *host;
 	char *portstr;
-	int i;
+	//int i; // Unused
 	if (!(type = strtok(inbuf, " ")) ||
 		!(host = strtok(NULL, " ")) ||
 		!(portstr = strtok(NULL, " "))){
@@ -221,7 +237,7 @@ void start_con(char *inbuf, void *data) {
 	char *type;
 	char *host;
 	char *portstr;
-	int i;
+	// int i; // Unused
 	if (!(type = strtok(inbuf, " ")) ||
 		!(host = strtok(NULL, " ")) ||
 		!(portstr = strtok(NULL, " "))){
@@ -300,7 +316,7 @@ void upload_xl3(Ringbuf *rbuf, CURLM *multi){
 	PouchReq *pr;
 	int pmt;
 	pmt_upls *data;
-	pmt_upls pmts[19*16*32] = {0}; // 19*16*32 = num pmt's / does this initialize to 0? maybe...
+	pmt_upls pmts[19*16*32] = {{0}}; // 19*16*32 = num pmt's / does this initialize to 0? maybe...
 
 	while(!ringbuf_isempty(rbuf)){
 		ringbuf_pop(rbuf, (void **)&data);
@@ -356,6 +372,16 @@ void signal_cb(evutil_socket_t sig, short events, void *user_data) {
 	//struct event_base *base = user_data;
 	PouchMInfo *pmi = (PouchMInfo *)user_data;
 	printf("Caught an interrupt signal; exiting.\n");
+	Node *tmp;
+	Node *easy_handles = (Node *)pmi->custom;
+	nd_foreach_child(tmp, easy_handles){ // TODO: good?
+		printf("REMOVED NODE %p (data = %p\n", tmp, tmp->data);
+		tmp = nd_rem(tmp);
+		pr_free(tmp->data); // this should be the PouchReq object with easy_handle
+		tmp->data = NULL;
+		nd_free(tmp); // TODO: while tmp != NULL remove loop?
+		printf("... still_running = %d\n", pmi->still_running);
+	}
 	pmi_multi_cleanup(pmi);
 	//event_base_loopbreak(base);
 	event_base_loopbreak(pmi->base);
@@ -454,6 +480,7 @@ void controller_event_cb(struct bufferevent *bev, short events,void *ctx) {
 		perror("Error from bufferevent (controller)");
 	if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) {
 		bufferevent_free(bev);
+		controller_bev = NULL;
 		have_controller--;
 		fprintf(stderr, "Closed controller connection.\n");
 	}
@@ -468,6 +495,7 @@ void listener_accept_cb(struct evconnlistener *listener,evutil_socket_t fd, stru
 		bufferevent_setcb(bev, controller_read_cb, NULL,
 				  controller_event_cb, ctx); // ctx holds the PouchMInfo object. pass this on.
 		bufferevent_enable(bev, EV_READ | EV_WRITE);
+		controller_bev = bev;
 		have_controller++;
 	} else {
 		EVUTIL_CLOSESOCKET(fd);
@@ -493,7 +521,17 @@ void pr_callback(PouchReq *pr, PouchMInfo *pmi){
 		the user that a request was completed.
 	*/
 	printf("%s request to %s returned %s\n", pr->method, pr->url, pr->resp.data);
-	pr_free(pr);
+	Node *tmp;
+	Node *easy_handles = (Node *)pmi->custom;
+	nd_foreach_child(tmp, easy_handles){
+		if(tmp->data == pr){
+			printf("REMOVED NODE %p (data = %p, pr = %p)\n", tmp, tmp->data, pr);
+			tmp = nd_rem(tmp);
+			pr_free(tmp->data);
+			free(tmp);
+			break;
+		}
+	}
 }
 
 int main(int argc, char **argv){
@@ -528,7 +566,9 @@ int main(int argc, char **argv){
 	}
 	
 	// Create the PouchMInfo object for use in callbacks
-	PouchMInfo *pmi = pr_mk_pmi(base, dnsbase, &pr_callback, NULL);
+	
+	Node *easy_handles = nd_make(NULL);
+	PouchMInfo *pmi = pr_mk_pmi(base, dnsbase, &pr_callback, (void *)easy_handles);
 	if(!pmi){
 		fprintf(stderr, "Could not create a PouchMInfo structure\n");
 		return 4;
@@ -595,14 +635,23 @@ int main(int argc, char **argv){
 	printf("event base finished.\n");
 	
 	// Clean up
+	// TODO: remove all connections?
+	stop_all_cons();
+	// TODO: clean up controller?
+	if(controller_bev != NULL){
+		bufferevent_free(controller_bev);
+		puts("Freed controller_bev");
+	}
 	event_del(signal_event);
 	free(signal_event);
 	event_del(xl3_watcher);
 	free(xl3_watcher);
 	evconnlistener_free(listener);
 	printf("about to delete pmi %p\n", pmi);
+	printf("... freeing pmi->custom (Node * %p)\n", pmi->custom);
+	nd_destroy(pmi->custom);
 	pr_del_pmi(pmi); // frees 'base' and 'dnsbase', too
-	
+	// TODO: free xl3_buf?
 	// Exit
 	return 0;
 }
